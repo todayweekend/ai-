@@ -115,6 +115,28 @@ def _install_null_streams():
 
 _install_null_streams()
 
+# --- 控制台编码兼容 -----------------------------------------------------------
+# 上面那段只处理了「根本没有 stdout」。还有一种更隐蔽的情况：stdout 有，但它的
+# 编码装不下中文 —— Windows 在非中文代码页下就是 cp1252 / cp437（英文版系统、
+# CI 的 runner 都这样）。start.bat 里那行 `set PYTHONIOENCODING=utf-8` 只覆盖了
+# 「双击 bat 启动」这一条路，直接 `python app.py` 起（README 里给 macOS / Linux
+# 的写法、CI 里的写法）就绕过了它。
+# 这时任何一句中文 print 都会抛 UnicodeEncodeError，而它偏偏发生在
+# _load_config() 里、uvicorn.run() 之前 —— 进程当场退出；更麻烦的是 except 分支
+# 里那句 print 会再崩一次，把真正的原因也盖掉，只看到一个莫名其妙的 traceback。
+# 处理办法：
+#   · 输出被重定向到文件 / 管道（非终端）→ 直接改用 UTF-8，日志完整可读；
+#   · 真终端 → 编码不动，只把错误策略改成 replace（装不下的字变成 ?），
+#     反正终端本来就显示不出这个字，但绝不能再让它把进程带崩。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        if _stream.isatty():
+            _stream.reconfigure(errors="replace")
+        else:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # 内置兜底配置 = 一份「没有成员、没有密钥」的空配置。
 # 分享给别人时，对方第一次启动走这条路径：拿到空工作台，自己填接口和 Key，
 # 不会用上任何人的密钥。
