@@ -15,6 +15,15 @@ import time
 import urllib.error
 import urllib.request
 
+# Windows 控制台默认不是 UTF-8（英文系统 / CI runner 上是 cp1252），中文输出会乱码，
+# 严重时直接抛 UnicodeEncodeError —— 明明用例都过了，却在最后打印汇总时崩掉、白跑一遍。
+# 这里统一成 UTF-8（跟 test_plugins.py 一致）。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 BASE = os.environ.get("WB_BASE", "http://127.0.0.1:7860")
 OUT, FAIL = [], []
 PY = sys.executable or "python"

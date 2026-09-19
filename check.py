@@ -28,6 +28,14 @@ import sys
 import urllib.error
 import urllib.request
 
+# Windows 控制台默认不是 UTF-8（英文系统上是 cp1252），中文输出会直接抛
+# UnicodeEncodeError —— 自检脚本自己先崩了，就一句提示都给不出来了，先兜住。
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 OK, WARN, BAD = "[ OK ]", "[警告]", "[致命]"
 fatal = 0

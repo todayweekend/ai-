@@ -16,7 +16,7 @@ import sys
 BASE = os.path.dirname(os.path.abspath(__file__))
 STARTUP = os.path.join(os.environ.get("APPDATA", ""),
                        r"Microsoft\Windows\Start Menu\Programs\Startup")
-VBS = os.path.join(STARTUP, "TwinAIWorkbench.vbs")
+VBS = os.path.join(STARTUP, "AIWorkbench.vbs")
 PYW = os.path.join(BASE, "venv", "Scripts", "pythonw.exe")
 APP = os.path.join(BASE, "app.py")
 

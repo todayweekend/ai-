@@ -2441,7 +2441,7 @@ async function loadPlugins(){
   catch(e){ box.innerHTML='<p class="note">读取失败：'+e+'</p>'; return; }
   if(r.error){ box.innerHTML='<p class="note">'+r.error+'</p>'; return; }
   document.getElementById('plugNote').textContent =
-    '配置：'+r.profile+'　插件目录：'+r.dir+'　（改动实时生效，写前自动备份 .bak_twinai）';
+    '配置：'+r.profile+'　插件目录：'+r.dir+'　（改动实时生效，写前自动备份 .bak_workbench）';
   box.innerHTML='';
   const list=r.plugins||[];
   if(!list.length){ box.innerHTML='<p class="note">暂无插件。</p>'; return; }

@@ -1155,7 +1155,7 @@ def exec_tool(name, args, ai_key="agent_a"):
                 # 绕开本机可能失效的系统代理（ProxyHandler({})），否则易被劫持/报 502
                 _opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
                 _reqq = urllib.request.Request(
-                    url, headers={"User-Agent": "Mozilla/5.0 (compatible; TwinAI/1.0)"})
+                    url, headers={"User-Agent": "Mozilla/5.0 (compatible; MultiAIWorkbench/1.0)"})
                 with _opener.open(_reqq, timeout=20) as _resp:
                     _code = getattr(_resp, "status", "?")
                     _charset = _resp.headers.get_content_charset() or "utf-8"
@@ -3213,7 +3213,7 @@ def _write_dsh_conf(conf):
     try:
         with open(DSH_WEB_PROFILE, "r", encoding="utf-8") as f:
             old = f.read()
-        with open(DSH_WEB_PROFILE + ".bak_twinai", "w", encoding="utf-8") as f:
+        with open(DSH_WEB_PROFILE + ".bak_workbench", "w", encoding="utf-8") as f:
             f.write(old)
     except Exception:
         pass
