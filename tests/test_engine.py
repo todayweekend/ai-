@@ -133,7 +133,11 @@ a = find_agent(KEY)
 ok("新成员默认是接口引擎", a and (a.get("engine") or {}).get("type") == "api",
    a and a.get("engine"))
 
-cmd_arg = '"%s" -c "import sys;print(\'ARG:\'+sys.argv[1])" "{prompt}"' % PY
+# 这个「引擎」是一条本机 python 命令，它要把工作台递过来的整段 prompt 原样打回来。
+# prompt 里含中文，而子进程 stdout 走的是本机代码页 —— 英文 Windows / CI runner 上是
+# cp1252，打印中文直接抛 UnicodeEncodeError、命令以非零码退出，测试就变成假失败
+# （本机是中文代码页，所以一直没暴露）。显式给子进程开 UTF-8 模式，与平台代码页无关。
+cmd_arg = '"%s" -X utf8 -c "import sys;print(\'ARG:\'+sys.argv[1])" "{prompt}"' % PY
 set_engine(cmd=cmd_arg)
 time.sleep(0.2)
 a = find_agent(KEY)
@@ -144,7 +148,7 @@ ok("命令引擎答话（参数传法）", "ARG:" in out, out[:200])
 
 log("")
 log("== 3. stdin 传法（命令里不写 {prompt}） ==")
-cmd_stdin = '"%s" -c "import sys;print(\'STDIN:\'+sys.stdin.read().strip())"' % PY
+cmd_stdin = '"%s" -X utf8 -c "import sys;print(\'STDIN:\'+sys.stdin.read().strip())"' % PY
 set_engine(cmd=cmd_stdin)
 time.sleep(0.2)
 a = find_agent(KEY)
