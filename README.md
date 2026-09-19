@@ -5,6 +5,9 @@
 
 后端 FastAPI + 原生前端 + SSE 流式，**零构建、零前端框架**，克隆下来配个 key 就能跑。
 
+> 💬 **QQ 交流群：874924265** —— 装不上、配不通、想写插件卡住了，都可以进来问；
+> 也欢迎在里面提需求、报 bug、晒你自己的分身。
+
 ```
 ┌─────────┬──────────────┬──────────────────────────────────────┐
 │ 功能栏  │  聊天列表    │  聊天窗口                            │
@@ -46,12 +49,9 @@
 
 ## 快速开始
 
-> 下面第一行的 `<你的仓库地址>` 换成实际地址（GitHub 仓库页右上角绿色的
-> 「Code」按钮里能直接复制）；`<克隆下来的目录名>` 换成你 clone 出来的文件夹名。
-
 ```bash
-git clone <你的仓库地址>
-cd <克隆下来的目录名>
+git clone https://github.com/todayweekend/ai-.git
+cd ai-
 python -m venv venv
 # Windows
 venv\Scripts\pip install -r requirements.txt
@@ -401,6 +401,7 @@ MIT —— 见 [LICENSE](LICENSE)。
 
 ## 参与与反馈
 
+- 加群聊天：**QQ 交流群 874924265**（安装 / 配置 / 插件问题，或想晒自己的分身）
 - 想一起改：见 [CONTRIBUTING.md](CONTRIBUTING.md)（装环境 / 跑测试 / 提 PR）
 - 版本变更：见 [CHANGELOG.md](CHANGELOG.md)
 - 安全问题：见 [SECURITY.md](SECURITY.md)

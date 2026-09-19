@@ -14,6 +14,9 @@ jobs:
       matrix:
         python-version: ["3.9", "3.12"]
 
+    env:
+      WB_BASE: http://127.0.0.1:7860
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,8 +33,47 @@ jobs:
       - name: 语法检查（全项目编译一遍）
         run: python -m compileall -q app.py check.py autostart.py plugins tests mcp_demo
 
+      # 下面两个测试都是「对着正在运行的服务打接口」的端到端测试，
+      # 所以得先把工作台真拉起来。首次启动会自动生成一份空的 config.json
+      # （没有成员、没有任何密钥），所以这一步不需要任何 API Key。
+      - name: 启动工作台（后台）
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath python -ArgumentList "app.py" `
+                 -RedirectStandardOutput server-out.log `
+                 -RedirectStandardError server-err.log `
+                 -PassThru -NoNewWindow
+          Write-Host "app.py 已启动，PID = $($p.Id)"
+
+      - name: 等服务就绪
+        shell: pwsh
+        run: |
+          for ($i = 1; $i -le 60; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri "$env:WB_BASE/api/plugins" -UseBasicParsing -TimeoutSec 5
+              if ($r.StatusCode -eq 200) {
+                Write-Host "服务已就绪（第 $i 秒）→ $env:WB_BASE"
+                exit 0
+              }
+            } catch { }
+            Start-Sleep -Seconds 1
+          }
+          Write-Host "::error::等了 60 秒服务还没起来，看下面的服务端日志"
+          exit 1
+
       - name: 插件系统端到端测试
         run: python tests/test_plugins.py
 
       - name: 工作引擎与身份文件测试
         run: python tests/test_engine.py
+
+      - name: 失败时倒出服务端日志
+        if: failure()
+        shell: pwsh
+        run: |
+          foreach ($f in @("server-out.log", "server-err.log")) {
+            if (Test-Path $f) {
+              Write-Host "===== $f ====="
+              Get-Content $f -Tail 200
+            }
+          }
