@@ -1,0 +1,2866 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多 AI 工作台</title>
+<style>
+  /* ================= 主题变量：浅色（默认） ================= */
+  :root{
+    --r-btn:5px; --r-msg:8px; --r-box:5px;
+    --bg:#f4f5f7; --panel:#ffffff; --panel2:#eef0f3; --line:#dcdfe4;
+    --text:#1b1e23; --muted:#6b7280;
+    --accent:#2563eb; --accent-rgb:37,99,235; --on-accent:#ffffff;
+    --user-bg:rgba(var(--accent-rgb),.16);
+    --tool-bg:#f7f8fa; --tool-line:#e5e8ec;
+    --shadow:0 1px 2px rgba(16,24,40,.06);
+    --fs:14px; --lh:1.6; --mw:78%;
+    --ga:.28; --gw:25%;
+    --rail-w:52px; --clist-w:216px;
+  }
+  /* ================= 主题变量：深色 ================= */
+  body[data-theme="dark"]{
+    --bg:#0f1216; --panel:#161a20; --panel2:#1d222a; --line:#2a313b;
+    --text:#e6e9ee; --muted:#8b93a0;
+    --tool-bg:#0c0f14; --tool-line:#2a313b;
+    --shadow:none;
+  }
+  body[data-round="soft"]{ --r-btn:20px; --r-msg:14px; --r-box:10px; }
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    font-size:var(--fs);
+    display:flex; overflow:hidden;   /* 三栏布局由 body 直接排 */
+  }
+
+  /* ================= 插件注入区（背景板 / 插槽 / 轻提示） ================= */
+  #pluginBg{position:fixed;inset:0;z-index:-1;pointer-events:none;display:none;
+    background-position:center;background-size:cover;background-repeat:no-repeat}
+  #pluginBg.on{display:block}          /* 负层级：压在主题背景之上、所有面板之下 */
+  .wb-snip{display:contents}           /* 插槽内容的包裹层不参与布局 */
+  .wbslot{display:flex;flex-direction:column;gap:8px;align-items:center}
+  #wbToast{position:fixed;right:16px;bottom:16px;z-index:99999;display:flex;
+    flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
+  .wb-toast{background:var(--panel);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:8px 12px;font-size:12.5px;line-height:1.5;max-width:330px;
+    box-shadow:0 6px 18px rgba(0,0,0,.16);opacity:0;transform:translateY(6px);
+    transition:.22s;white-space:pre-wrap}
+  .wb-toast.on{opacity:1;transform:none}
+
+  .btn{
+    background:var(--panel);color:var(--text);border:1px solid var(--line);
+    border-radius:var(--r-btn);padding:5px 10px;cursor:pointer;font-size:12px;
+    transition:.12s;font-family:inherit;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.danger:hover{border-color:#d0453c;color:#d0453c}
+
+  /* ================= 第一栏：功能栏（QQ 左侧小图标） ================= */
+  #rail{
+    width:var(--rail-w);flex:none;background:var(--panel);
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;
+    padding:10px 0 12px;gap:8px;
+  }
+  .railicon{
+    width:37px;height:37px;border-radius:10px;flex:none;
+    display:flex;align-items:center;justify-content:center;
+    font-size:19px;cursor:pointer;color:var(--muted);
+    transition:.12s;user-select:none;
+  }
+  .railicon:hover{background:var(--panel2);color:var(--text)}
+  .railicon.on{background:var(--accent);color:var(--on-accent)}
+  .railicon.bottom{margin-top:auto}
+
+  /* ================= 第二栏：聊天列表 ================= */
+  #clist{
+    width:var(--clist-w);flex:none;background:var(--panel2);
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;min-height:0;
+  }
+  #clistTop{
+    display:flex;align-items:center;gap:7px;padding:9px 10px;
+    border-bottom:1px solid var(--line);background:var(--panel);
+  }
+  #clistTop .search{
+    flex:1;background:var(--panel2);border:1px solid var(--line);
+    border-radius:var(--r-btn);padding:5px 9px;font-size:12px;color:var(--muted);
+    user-select:none;
+  }
+  #addBtn{
+    width:28px;height:28px;flex:none;border:none;border-radius:var(--r-btn);
+    background:var(--accent);color:var(--on-accent);font-size:17px;line-height:1;
+    cursor:pointer;font-family:inherit;
+  }
+  #addBtn:hover{filter:brightness(1.1)}
+  #clistItems{flex:1;overflow-y:auto;padding:6px}
+  .csec{
+    font-size:11px;color:var(--muted);padding:8px 8px 3px;user-select:none;
+  }
+  .citem{
+    display:flex;align-items:center;gap:9px;
+    padding:7px 8px;border-radius:9px;cursor:pointer;user-select:none;
+    transition:.1s;position:relative;
+  }
+  .citem:hover{background:rgba(var(--accent-rgb),.07)}
+  .citem.on{background:rgba(var(--accent-rgb),.14)}
+  .citem .cnm{
+    flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13.5px;
+  }
+  .citem .cnm small{color:var(--muted);font-size:11.5px;margin-left:3px}
+  .citem .del{
+    display:none;flex:none;width:20px;height:20px;border:none;border-radius:5px;
+    background:transparent;color:var(--muted);cursor:pointer;font-size:12px;
+  }
+  .citem:hover .del{display:block}
+  .citem .del:hover{background:#d0453c;color:#fff}
+  /* 头像：圆角方块，身份色底 + emoji，QQ 风格 */
+  .gava{
+    width:36px;height:36px;border-radius:9px;flex:none;
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;color:#fff;
+  }
+  .gava.sm{width:28px;height:28px;font-size:14px;border-radius:7px}
+
+  /* ================= 第三栏：聊天窗口 ================= */
+  #main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  #chead{
+    padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel);
+    display:flex;align-items:center;gap:9px;min-height:52px;
+  }
+  #chead .cname{font-size:15px;font-weight:600}
+  #chead .csub{font-size:11.5px;color:var(--muted)}
+  #chead .spacer{flex:1}
+  #chat{flex:1;min-width:0;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+  #chatPlaceholder{
+    flex:1;display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:13px;
+  }
+
+  /* ---- 消息行：头像 + 名字 + 气泡（单聊/群聊共用） ---- */
+  .gmsg{display:flex;gap:9px;align-items:flex-start;max-width:var(--mw)}
+  .gmsg.user{align-self:flex-end;flex-direction:row-reverse}
+  .gmsg .gcol{display:flex;flex-direction:column;gap:3px;min-width:0;max-width:100%}
+  .gmsg.user .gcol{align-items:flex-end}
+  .gname{font-size:calc(var(--fs) - 2.5px);color:var(--muted);padding:0 2px}
+  .gbody{
+    padding:8px 12px;border-radius:var(--r-msg);
+    background-color:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);
+    font-size:var(--fs);line-height:var(--lh);
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .gmsg.user .gbody{background:var(--user-bg);border-color:rgba(var(--accent-rgb),.35)}
+  .gmsg.ai   .gbody{
+    border-left:3px solid var(--ai-c,var(--accent));
+    background-image:linear-gradient(90deg,
+      rgba(var(--ai-rgb,37,99,235),var(--ga)) 0%,
+      rgba(var(--ai-rgb,37,99,235),0) var(--gw),
+      transparent var(--gw));
+  }
+  body.nobar .gmsg.ai .gbody{border-left-width:1px}
+  /* 思考气泡：挂在发言者头像列下 */
+  .gthink{
+    background:transparent;border:1px dashed var(--line);color:var(--muted);
+    font-size:calc(var(--fs) - 1.5px);border-radius:var(--r-msg);padding:6px 10px;
+    white-space:pre-wrap;
+  }
+  .gthink.collapsed{
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .gthink .toggle{margin-top:4px;font-size:calc(var(--fs) - 3px);color:var(--accent);
+                  cursor:pointer;user-select:none}
+  body.noThink .gmsg.thinkrow{display:none}
+
+  /* ---- 文件卡片：AI 写出来的文件可直接预览 / 下载 ---- */
+  .files{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px}
+  .fcard{display:flex;align-items:center;gap:8px;padding:7px 10px;max-width:340px;
+         border:1px solid rgba(128,128,128,.25);border-radius:8px;background:rgba(128,128,128,.06)}
+  .fcard .fi{font-size:16px;line-height:1;flex:none}
+  .fcard .fm{min-width:0;flex:1}
+  .fcard .fn{display:block;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fcard .fs{display:block;font-size:11px;opacity:.6;margin-top:1px}
+  .fcard .fa{display:flex;gap:6px;flex:none}
+  .fcard button{font-size:11.5px;padding:3px 8px;border-radius:6px;cursor:pointer;
+                border:1px solid rgba(128,128,128,.3);background:transparent;color:inherit}
+  .fcard button:hover{background:var(--accent,#2563eb);color:#fff;border-color:transparent}
+  .fcard.deny{opacity:.6}
+  #filePrev{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
+            background:rgba(0,0,0,.55);padding:28px}
+  #filePrev.on{display:flex}
+  #filePrev .fpbox{background:var(--panel,#fff);color:inherit;border-radius:12px;
+                   max-width:min(920px,92vw);max-height:88vh;width:100%;display:flex;flex-direction:column;
+                   overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  #filePrev .fphd{display:flex;align-items:center;gap:10px;padding:12px 16px;
+                  border-bottom:1px solid rgba(128,128,128,.2)}
+  #filePrev .fphd b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #filePrev .fphd .sp{flex:1}
+  #filePrev .fpbd{padding:14px 16px;overflow:auto}
+  #filePrev pre{margin:0;white-space:pre-wrap;word-break:break-word;
+                font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12.5px;line-height:1.6}
+  #filePrev img{max-width:100%;border-radius:8px;display:block;margin:0 auto}
+  #filePrev .fphd button{cursor:pointer;font-size:12px;padding:4px 10px;border-radius:6px;
+                         border:1px solid rgba(128,128,128,.3);background:transparent;color:inherit}
+  #filePrev .fphd button:hover{background:var(--accent,#2563eb);color:#fff;border-color:transparent}
+  .tool{
+    margin-top:2px;font-size:calc(var(--fs) - 2px);background:var(--tool-bg);
+    border:1px solid var(--tool-line);border-radius:var(--r-btn);
+    padding:5px 9px;color:var(--muted);cursor:pointer;
+  }
+  .tool:hover{color:var(--text)}
+  .tool .r{display:none;margin-top:6px;color:var(--muted);white-space:pre-wrap;
+           font-family:Consolas,"Courier New",monospace;font-size:calc(var(--fs) - 3px)}
+  .tool.open .r{display:block}
+  .tool .nm{color:var(--accent);font-weight:600}
+
+  .msg.sys{
+    align-self:center;color:var(--muted);
+    font-size:calc(var(--fs) - 2px);
+    text-align:center;padding:2px;max-width:100%;
+  }
+  .typing::after{content:"▍";animation:blink 1s steps(1) infinite;color:var(--accent)}
+  @keyframes blink{50%{opacity:0}}
+
+
+  /* ---------------- 输入栏 ---------------- */
+  #inputbar{
+    border-top:1px solid var(--line);background:var(--panel);padding:9px 16px;
+    display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;
+  }
+  /* ---- 聊天附件：输入框上方待发送的文件 / 图片 ---- */
+  #attList{width:100%;display:flex;flex-wrap:wrap;gap:8px}
+  #attList:empty{display:none}
+  #attList .pending{display:flex;align-items:center;gap:7px;padding:5px 9px;font-size:12px;
+    border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--text);max-width:300px}
+  #attList .pending img{width:26px;height:26px;object-fit:cover;border-radius:5px;flex:none}
+  #attList .pending .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+  #attList .pending .ps{opacity:.55;font-size:11px;flex:none}
+  #attList .pending button{border:none;background:transparent;color:var(--text);opacity:.45;
+    cursor:pointer;font-size:13px;line-height:1;padding:0 2px;flex:none}
+  #attList .pending button:hover{opacity:1;color:#e11d48}
+  #attBtn{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:var(--r-box);padding:0 13px;height:40px;cursor:pointer;
+    font-size:calc(var(--fs) + 2px);font-family:inherit}
+  #attBtn:hover{border-color:var(--accent)}
+  #attBtn.off{opacity:.45;cursor:not-allowed}
+  /* ---- 消息气泡里的附件回显 ---- */
+  .atts{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 2px}
+  .atts .att{display:flex;align-items:center;gap:7px;padding:5px 9px;font-size:12px;
+    border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+    color:var(--text);cursor:pointer;max-width:320px}
+  .atts .att img{width:26px;height:26px;object-fit:cover;border-radius:5px;flex:none}
+  .atts .att span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .atts .att:hover{border-color:var(--accent)}
+  #inputbar textarea{
+    flex:1;resize:none;background:var(--panel2);color:var(--text);
+    border:1px solid var(--line);border-radius:var(--r-box);padding:8px 11px;
+    font-size:var(--fs);height:40px;max-height:150px;font-family:inherit;line-height:1.5;
+  }
+  #inputbar textarea:focus{outline:none;border-color:var(--accent)}
+  #send{
+    background:var(--accent);color:var(--on-accent);border:none;
+    border-radius:var(--r-box);padding:0 20px;height:40px;font-weight:600;
+    cursor:pointer;font-size:calc(var(--fs) - .5px);font-family:inherit;
+  }
+  #send:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ---------------- 建群弹窗 ---------------- */
+  #gmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:60}
+  #gmask.on{display:flex;align-items:center;justify-content:center}
+  #gmodal{
+    width:340px;max-width:92vw;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.2);overflow:hidden;
+  }
+  #gmodal .gt{padding:13px 16px;font-weight:600;font-size:14px;border-bottom:1px solid var(--line)}
+  #gmodal .gb{padding:14px 16px}
+  #gmodal .aginput{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:var(--r-btn);padding:6px 9px;font-size:12.5px;font-family:inherit;width:100%;
+  }
+  #gmodal .aginput:focus{outline:none;border-color:var(--accent)}
+  #gmodal .mlist{margin-top:10px;max-height:240px;overflow-y:auto}
+  #gmodal .mrow{
+    display:flex;align-items:center;gap:9px;padding:6px 6px;border-radius:8px;cursor:pointer;
+    user-select:none;font-size:13.5px;
+  }
+  #gmodal .mrow:hover{background:var(--panel2)}
+  #gmodal .mrow input{width:15px;height:15px;accent-color:var(--accent)}
+  #gmodal .gf{padding:11px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+  #gmodal .gf .ok{background:var(--accent);color:var(--on-accent);border:none;
+    border-radius:var(--r-btn);padding:6px 16px;cursor:pointer;font-size:12.5px;font-family:inherit}
+  #gmodal .gf .ok:hover{filter:brightness(1.1)}
+
+  /* ---------------- 设置：独立窗口（居中弹出） ---------------- */
+  #mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:40}
+  #mask.on{display:block}
+  #drawer{
+    position:fixed;inset:0;margin:auto;width:660px;max-width:94vw;
+    height:min(86vh,780px);
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;z-index:50;
+    display:none;flex-direction:column;
+    box-shadow:0 18px 60px rgba(0,0,0,.28);overflow:hidden;
+  }
+  #drawer.on{display:flex}
+  .dhead{
+    padding:12px 14px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;
+  }
+  .dhead .spacer{flex:1}
+  .dbody{flex:1;overflow-y:auto;padding:12px 14px 24px}
+  .dbody section{margin-bottom:18px}
+  .dbody h3{
+    font-size:12px;margin:0 0 9px;color:var(--muted);font-weight:600;
+    text-transform:uppercase;letter-spacing:.5px;
+    border-bottom:1px solid var(--line);padding-bottom:5px;
+  }
+  .row{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px}
+  .row label{flex:1;color:var(--text)}
+  .row input[type=range]{flex:1.2;accent-color:var(--accent)}
+  .row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
+  .row .val{width:46px;text-align:right;color:var(--muted);font-size:12px;
+            font-family:Consolas,monospace}
+  .row select{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:var(--r-btn);padding:4px 7px;font-size:12px;font-family:inherit;
+    max-width:180px;
+  }
+  .seg{display:flex;border:1px solid var(--line);border-radius:var(--r-btn);
+       overflow:hidden;background:var(--panel2)}
+  .seg button{
+    background:transparent;color:var(--muted);border:none;
+    padding:5px 11px;cursor:pointer;font-size:12.5px;transition:.12s;
+    border-right:1px solid var(--line);font-family:inherit;
+  }
+  .seg button:last-child{border-right:none}
+  .seg button:hover{color:var(--text)}
+  .seg button.active{background:var(--accent);color:var(--on-accent);font-weight:600}
+  .swatches{display:flex;gap:6px}
+  .sw{width:22px;height:22px;border-radius:4px;border:2px solid transparent;cursor:pointer}
+  .sw.on{border-color:var(--text)}
+  .note{font-size:11.5px;color:var(--muted);line-height:1.5;margin:6px 0 0}
+
+  /* ---------------- 设置：标签页 ---------------- */
+  #drawer .tabs{
+    display:flex;gap:2px;padding:8px 10px 0;flex:none;overflow-x:auto;
+    border-bottom:1px solid var(--line);
+  }
+  #drawer .tabs button{
+    background:transparent;border:none;border-bottom:2px solid transparent;
+    color:var(--muted);padding:7px 11px;font-size:12.5px;cursor:pointer;
+    font-family:inherit;white-space:nowrap;transition:.12s;
+  }
+  #drawer .tabs button:hover{color:var(--text)}
+  #drawer .tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+  .tabpane{display:none}
+  .tabpane.on{display:block}
+
+  /* ---------------- 成员编辑弹窗 ---------------- */
+  #amask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:80}
+  #amask.on{display:flex;align-items:center;justify-content:center;padding:24px}
+  #amodal{
+    width:min(580px,94vw);max-height:min(780px,90vh);background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;
+    overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.26);
+  }
+  #amodal .amtop{
+    display:flex;align-items:center;gap:8px;padding:11px 14px;flex:none;
+    border-bottom:1px solid var(--line);font-weight:600;font-size:13.5px;
+  }
+  #amodal .spacer{flex:1}
+  #amodal .ambody{flex:1;min-height:0;overflow-y:auto;padding:12px 14px 16px}
+  .amsec{
+    font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.4px;
+    margin:14px 0 7px;padding-bottom:4px;border-bottom:1px solid var(--line);
+  }
+  .amsec:first-child{margin-top:0}
+  .amrow{display:flex;align-items:center;gap:9px;margin-bottom:8px;font-size:12.5px}
+  .amrow>label{width:98px;flex:none;color:var(--text)}
+  .amrow input,.amrow textarea,.amrow select{
+    flex:1;min-width:0;background:var(--panel2);color:var(--text);
+    border:1px solid var(--line);border-radius:var(--r-btn);
+    padding:5px 8px;font-size:12px;font-family:inherit;
+  }
+  .amrow textarea{resize:vertical;line-height:1.5}
+  .amrow input:focus,.amrow textarea:focus,.amrow select:focus{
+    outline:none;border-color:var(--accent)
+  }
+  .amrow input[type=color]{padding:0;height:26px;cursor:pointer;flex:none;width:48px}
+  .amrow2{display:flex;gap:9px}
+  .amrow2 .amrow{flex:1}
+  .amrow2 .amrow>label{width:58px}
+  .amfoot{
+    display:flex;align-items:center;gap:8px;margin-top:18px;
+    padding-top:12px;border-top:1px solid var(--line);
+  }
+  .amfoot .spacer{flex:1}
+  .btn.ok{border-color:var(--accent);color:var(--accent)}
+  .btn.ok:hover{background:var(--accent);color:var(--on-accent)}
+  .btn.danger:hover{border-color:#d0453c;color:#d0453c}
+  .ready{font-size:10.5px;padding:1px 6px;border-radius:9px;border:1px solid var(--line);color:var(--muted)}
+  .ready.on{color:#0f766e;border-color:#0f766e}
+  .ready.off{color:#b45309;border-color:#b45309}
+  .k{font-family:Consolas,monospace;font-size:11px;background:var(--panel2);
+     padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+  .row input.aginput{
+    flex:1;min-width:0;background:var(--panel2);color:var(--text);
+    border:1px solid var(--line);border-radius:var(--r-btn);
+    padding:5px 8px;font-size:12px;font-family:inherit;
+  }
+  .row input.aginput:focus{outline:none;border-color:var(--accent)}
+
+  /* 插件 / 成员卡片 */
+  .plug{border:1px solid var(--line);border-radius:var(--r-btn);padding:9px 10px;margin-bottom:9px}
+  .plug .ptop{display:flex;align-items:center;gap:7px;font-size:13px}
+  .plug .ptop b{font-weight:600}
+  .plug .ver{color:var(--muted);font-size:11px;font-family:Consolas,monospace}
+  .tag{font-size:10.5px;padding:1px 6px;border-radius:9px;border:1px solid var(--line);color:var(--muted)}
+  .tag.on{color:#0f766e;border-color:#0f766e}
+  .tag.off{color:#b45309;border-color:#b45309}
+  .plug .pdesc{font-size:11.5px;color:var(--muted);margin:5px 0 7px;line-height:1.45}
+  .plug .pops{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .plug .pops button{
+    background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    border-radius:var(--r-btn);padding:3px 9px;font-size:11.5px;cursor:pointer;font-family:inherit;
+  }
+  .plug .pops button:hover{border-color:var(--accent);color:var(--accent)}
+  .plug .pops button.warn:hover{border-color:#d0453c;color:#d0453c}
+  .plug .pops select{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:var(--r-btn);padding:3px 6px;font-size:11.5px;font-family:inherit;
+  }
+  .path{font-size:10.5px;color:var(--muted);font-family:Consolas,monospace;
+        word-break:break-all;margin-top:5px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  /* ================= 插件面板弹窗 ================= */
+  #pmask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:70}
+  #pmask.on{display:flex;align-items:center;justify-content:center;padding:24px}
+  #pmodal{
+    width:min(880px,94vw);height:min(680px,88vh);background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;
+    overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.24);
+  }
+  #pmodal .pmtop{
+    display:flex;align-items:center;gap:8px;padding:10px 14px;
+    border-bottom:1px solid var(--line);font-weight:600;font-size:13.5px;flex:none;
+  }
+  #pmodal .pmbody{flex:1;min-height:0;overflow:auto;background:var(--panel2)}
+  #pmodal .pmbody iframe{width:100%;height:100%;border:0;background:#fff;display:block}
+  #pmodal pre{
+    margin:0;padding:16px 18px;white-space:pre-wrap;font-size:12.5px;line-height:1.68;
+    font-family:Consolas,"Courier New",monospace;color:var(--text);
+  }
+  .plugcard{
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+    margin-bottom:8px;background:var(--panel2);
+  }
+  .plugcard .pt{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;flex-wrap:wrap}
+  .plugcard .tag{
+    font-size:10.5px;font-weight:500;color:var(--muted);border:1px solid var(--line);
+    border-radius:20px;padding:0 7px;background:var(--panel);
+  }
+  .plugcard .tag.err{color:#d0453c;border-color:#d0453c}
+  .plugcard .pd{color:var(--muted);font-size:12px;margin:5px 0 8px;line-height:1.55}
+  .plugcard .pops{display:flex;gap:6px;flex-wrap:wrap}
+  code.k{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11.5px}
+
+  /* ================= 细节打磨 ================= */
+  *::-webkit-scrollbar{width:9px;height:9px}
+  *::-webkit-scrollbar-thumb{background:rgba(120,130,145,.34);border-radius:6px}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(120,130,145,.55)}
+  *::-webkit-scrollbar-track{background:transparent}
+  #chatPlaceholder{user-select:none}
+
+  /* ================= 自适应：窄窗口 / 小屏 ================= */
+  @media (max-width:1080px){ :root{--clist-w:196px} }
+  @media (max-width:900px){ :root{--clist-w:170px} }
+  @media (max-width:760px){
+    :root{--clist-w:148px;--fs:13.5px;--rail-w:46px}
+    #drawer{width:100vw;max-width:100vw}
+    #pmodal{width:96vw;height:90vh}
+    #chat{padding:12px}
+  }
+
+
+/* ---- 过程可见：步骤耗时 / 消耗徽章 / 产出文件抽屉 ---- */
+.tdur{display:inline-block;margin-left:4px;padding:0 5px;border-radius:5px;
+  font-size:11px;line-height:16px;background:rgba(128,128,128,.18);opacity:.85}
+.usagerow{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;
+  padding:6px 0 2px}
+.ubadge{font-size:11px;line-height:18px;padding:1px 8px;border-radius:9px;
+  background:rgba(128,128,128,.14);color:var(--text-2);white-space:nowrap}
+#ftPanel{position:fixed;right:0;top:52px;bottom:66px;width:272px;z-index:60;
+  display:none;flex-direction:column;background:var(--panel);
+  border-left:1px solid rgba(128,128,128,.22)}
+#ftPanel.on{display:flex}
+.fth{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;font-size:13px;font-weight:600;border-bottom:1px solid rgba(128,128,128,.16)}
+.fth button{background:none;border:0;color:var(--text-2);font-size:17px;cursor:pointer;line-height:1}
+#ftList{flex:1;overflow:auto;padding:8px}
+.ftgrp{font-size:11px;color:var(--text-2);margin:8px 0 4px;letter-spacing:.3px}
+.ftit{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:7px;
+  font-size:12px;cursor:pointer;overflow:hidden}
+.ftit:hover{background:rgba(128,128,128,.13)}
+.ftit .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ftit .s{font-size:10px;color:var(--text-2);flex:none}
+#ftBtn{background:none;border:0;color:var(--text-2);font-size:17px;cursor:pointer;
+  padding:0 6px;line-height:1}
+
+</style>
+</head>
+<body>
+
+<!-- 插件背景板层（插件在 plugin.json 的 ui.background 里指定图片即可） -->
+<div id="pluginBg"></div>
+
+<!-- ============ 第一栏：功能栏 ============ -->
+<div id="rail">
+  <div class="railicon on" id="railChat" title="聊天">💬</div>
+  <div class="railicon bottom" id="railSet" title="设置">☰</div>
+</div>
+
+<!-- ============ 第二栏：聊天列表 ============ -->
+<div id="clist">
+  <div id="clistTop">
+    <div class="search">🔍 搜索</div>
+    <button id="addBtn" title="创建群聊">＋</button>
+  </div>
+  <div id="clistItems"><!-- 由 JS 按成员与已存群聊动态生成 --></div>
+</div>
+
+<!-- ============ 第三栏：聊天窗口 ============ -->
+<div id="main">
+  <div id="chead" style="display:none">
+    <div id="cheadAva"></div>
+    <div>
+      <div class="cname" id="cheadName"></div>
+      <div class="csub" id="cheadSub"></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="allSpeakBtn" style="display:none" title="开：每条消息在场成员依次必答；关：智能判定谁该接话（省额度、不抢话）">⚡ 全员必答：关</button>
+    <button class="btn danger" id="clearConv" title="删除当前会话的全部聊天记录">清空记录</button>
+  </div>
+  <div id="chat"></div>
+<div id="ftPanel">
+  <div class="fth"><span>产出文件</span><button id="ftClose" title="关闭">×</button></div>
+  <div id="ftList"></div>
+</div>
+  <!-- AI 产出的文件：预览 / 下载 弹层 -->
+  <div id="filePrev"><div class="fpbox">
+    <div class="fphd">
+      <b id="fpName">文件预览</b><span class="sp"></span>
+      <button id="fpDl">下载</button><button id="fpClose">关闭</button>
+    </div>
+    <div class="fpbd" id="fpBody"></div>
+  </div></div>
+  <div id="chatPlaceholder">← 从左侧选择一个聊天开始</div>
+  <div id="inputbar" style="display:none">
+    <div id="attList"></div>
+    <textarea id="msg" placeholder="输入消息…（Enter 发送，Shift+Enter 换行）；📎 可传文件或图片，也可直接粘贴截图"></textarea>
+    <button id="attBtn" title="添加文件或图片">📎</button>
+    <button id="send">发送</button>
+  </div>
+  <input type="file" id="attFile" multiple style="display:none">
+</div>
+
+<!-- ============ 建群弹窗 ============ -->
+<div id="gmask">
+  <div id="gmodal">
+    <div class="gt">创建群聊</div>
+    <div class="gb">
+      <input class="aginput" id="gnName" placeholder="群名称（可留空，自动命名）">
+      <div class="mlist" id="gmList"><!-- AI 勾选列表 --></div>
+    </div>
+    <div class="gf">
+      <button class="btn" id="gmCancel">取消</button>
+      <button class="ok" id="gmOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 设置：一个窗口 + 标签页 ============ -->
+<div id="mask"></div>
+<div id="drawer">
+  <div class="dhead">
+    <span>设置</span>
+    <span class="note" id="buildTag" style="margin-left:10px;font-size:11px;opacity:.6"></span>
+    <div class="spacer"></div>
+    <button class="btn" id="closeSet">关闭</button>
+  </div>
+  <div class="tabs" id="setTabs">
+    <button data-t="look" class="on">外观与文字</button>
+    <button data-t="chat">会话与显示</button>
+    <button data-t="ai">AI 成员与模型</button>
+    <button data-t="plug">插件</button>
+    <button data-t="mcp">外部能力</button>
+    <button data-t="adv">高级与分享</button>
+  </div>
+  <div class="dbody">
+
+    <!-- ---------- 外观与文字 ---------- -->
+    <div class="tabpane on" data-p="look">
+      <section>
+        <h3>外观</h3>
+        <div class="row"><label>主题</label>
+          <div class="seg" id="setTheme">
+            <button data-v="light">浅色</button><button data-v="dark">深色</button>
+          </div>
+        </div>
+        <div class="row"><label>圆角</label>
+          <div class="seg" id="setRound">
+            <button data-v="compact">紧凑</button><button data-v="soft">圆润</button>
+          </div>
+        </div>
+        <div class="row"><label>强调色</label><div class="swatches" id="setAccent"></div></div>
+        <div class="row"><label>气泡渐变浓度</label>
+          <input type="range" id="setGa" min="0" max="60" step="2"><span class="val" id="gaVal"></span></div>
+        <div class="row"><label>渐变蔓延宽度</label>
+          <input type="range" id="setGw" min="10" max="70" step="5"><span class="val" id="gwVal"></span></div>
+        <div class="row"><label>左侧颜色条</label><input type="checkbox" id="setBar"></div>
+        <div class="row"><label>群聊显示发言者名字</label><input type="checkbox" id="setHead"></div>
+      </section>
+      <section>
+        <h3>文字</h3>
+        <div class="row"><label>正文字号</label>
+          <input type="range" id="setFs" min="11" max="20" step="1"><span class="val" id="fsVal"></span></div>
+        <div class="row"><label>行高</label>
+          <input type="range" id="setLh" min="1.3" max="2.0" step="0.05"><span class="val" id="lhVal"></span></div>
+        <div class="row"><label>气泡最大宽度</label>
+          <input type="range" id="setMw" min="50" max="100" step="2"><span class="val" id="mwVal"></span></div>
+      </section>
+    </div>
+
+    <!-- ---------- 会话与显示 ---------- -->
+    <div class="tabpane" data-p="chat">
+      <section>
+        <h3>会话</h3>
+        <div class="row"><label>切换会话</label>
+          <select id="sessList" title="切换会话（之前的聊天记录都在里面）"></select>
+        </div>
+        <div style="display:flex;gap:8px;margin:9px 0 4px">
+          <button class="btn" id="newSess" title="开一个新的会话，旧会话仍可在下拉里找回">＋ 新会话</button>
+        </div>
+      </section>
+      <section>
+        <h3>显示什么</h3>
+        <div class="row"><label><input type="checkbox" id="setThink"> 显示思考过程</label></div>
+        <div class="row"><label><input type="checkbox" id="setTools"> 显示工具调用</label></div>
+        <div class="row"><label><input type="checkbox" id="setToolsOpen"> 工具结果默认展开</label></div>
+        <div class="row"><label><input type="checkbox" id="setScroll"> 自动滚到底部</label></div>
+      </section>
+      <section>
+        <h3>群聊</h3>
+        <div class="row"><label><input type="checkbox" id="setDecide"> 接话判断</label></div>
+        <p class="note">
+          <b>开启</b>（默认）：先判断谁该接话 → 首字约慢 1 秒，但不会抢着说、不重复。<br>
+          <b>关闭</b>：跳过判断，群成员都回 → <b>首字更快</b>，但可能说重话。
+        </p>
+      </section>
+    </div>
+
+    <!-- ---------- AI 成员与模型 ---------- -->
+    <div class="tabpane" data-p="ai">
+      <section>
+        <h3>默认接口</h3>
+        <p class="note">
+          成员没单独配接口时，就用这里的。任何 <b>OpenAI 兼容</b>的平台都行
+          （DeepSeek / GPT / Kimi / GLM / 通义 / 本地 Ollama…）。
+        </p>
+        <div class="row"><label>服务商</label>
+          <select class="aginput" id="dvPreset">
+            <option value="">— 手动填（下面自己写地址）—</option>
+          </select></div>
+        <div class="row"><label>接口地址</label>
+          <input class="aginput" id="dvBaseUrl" placeholder="https://api.deepseek.com/v1"></div>
+        <div class="row"><label>模型名</label>
+          <input class="aginput" id="dvModel" list="dvModelList" placeholder="deepseek-flash"></div>
+        <datalist id="dvModelList"></datalist>
+        <div class="row"><label>API Key</label>
+          <input class="aginput" type="password" id="dvKey" autocomplete="off"
+                 placeholder="粘贴 Key 后点保存；已保存的会显示为圆点">
+          <button class="btn" type="button" data-eye="dvKey" title="显示 / 隐藏"
+                  style="flex:0 0 auto;padding:4px 9px">👁</button></div>
+        <p class="note" id="dvPresetNote"></p>
+        <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+          <button class="btn" id="dvSave">保存默认接口</button>
+          <button class="btn" id="dvFetchModels" title="用上面填的 Key 去问服务商要「可用模型列表」，拿到后填进模型名输入框的下拉里">⟳ 拉取可用模型</button>
+          <span class="note" id="dvState" style="margin:auto 0"></span>
+        </div>
+      </section>
+      <section>
+        <h3>成员</h3>
+        <div id="agentList"><p class="note">加载中…</p></div>
+        <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+          <button class="btn" id="agAddBtn">＋ 添加成员</button>
+          <button class="btn" id="agImportBtn" title="把自己的身份文件（SOUL / IDENTITY / USER…）导进来，一键建一个带人格的成员">⇪ 导入身份文件</button>
+          <input type="file" id="agImportFile" accept=".md,.txt" multiple style="display:none">
+        </div>
+        <p class="note">
+          「导入身份文件」= 分身配方：把几份 md 丢进来，它当场就成了一个带人格的成员，
+          文件会存进 <code class="k">personas/</code>。没有现成的？开源包的 <code class="k">personas/</code> 目录里有三份空白模板。
+        </p>
+        <p class="note">删除成员不会删除它的历史聊天记录。</p>
+      </section>
+      <section>
+        <h3>模型</h3>
+        <div id="modelRows"></div>
+        <p class="note" id="modelPrice"></p>
+        <p class="note" id="engineNote"></p>
+      </section>
+    </div>
+
+    <!-- ---------- 插件 ---------- -->
+    <div class="tabpane" data-p="plug">
+      <section>
+        <h3>工作台插件</h3>
+        <p class="note">
+          往 <code class="k" id="plugDir">plugins/</code> 里丢一个文件夹就能改造工作台 ——
+          <b>界面（背景板 / 配色 / 圆角 / 按钮）、回复方式（人格 / 模型 / 文案加工 / 自定义指令）、接口</b>
+          全都能改，不用动核心代码。改完点「⟳ 重载插件 + 界面」即时生效。
+        </p>
+        <div id="wbPlugins"><p class="note">加载中…</p></div>
+        <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+          <button class="btn" id="plugReload" title="重新扫描 plugins/ 目录并重载界面（改完插件后点这里，不用重启服务）">⟳ 重载插件 + 界面</button>
+          <button class="btn" id="plugNew" title="生成一个插件骨架：清单 + 界面 CSS/JS + 后端钩子 + 面板页">＋ 新建插件</button>
+          <button class="btn" id="plugGuide" title="插件怎么写：目录结构、ui 段、11 个钩子、window.WB 接口">开发指南</button>
+        </div>
+        <p class="note" style="margin-top:7px">
+          已启用的插件：<span id="plugUiCount">—</span>
+        </p>
+      </section>
+      <section>
+        <h3>外部引擎插件（DSH Web）</h3>
+        <div id="plugins"><p class="note">加载中…</p></div>
+        <p class="note" id="plugNote"></p>
+      </section>
+    </div>
+
+<!-- ---------- 外部能力（MCP / DSH 插件） ---------- -->
+<div class="tabpane" data-p="mcp">
+  <style>
+    .mcpCard{border:1px solid rgba(127,127,127,.28);border-radius:9px;padding:9px 11px;margin:8px 0;background:rgba(127,127,127,.06)}
+    .mcpCard .h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .mcpCard .n{font-weight:600;font-size:13.5px}
+    .mcpTag{font-size:11px;padding:1px 8px;border-radius:20px;border:1px solid currentColor;opacity:.92}
+    .mcpOn{color:#3ddc97}.mcpOff{color:#ff8a8a}
+    .mcpCmd{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:11.5px;opacity:.62;margin-top:5px;word-break:break-all;line-height:1.5}
+    .mcpTools{font-size:11.5px;opacity:.78;margin-top:5px;line-height:1.5}
+    .mcpErr{font-size:11.5px;color:#ff9a9a;margin-top:5px;word-break:break-all;line-height:1.5}
+    .mcpRow{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+    .mcpIn{background:transparent;border:1px solid rgba(127,127,127,.35);color:inherit;border-radius:7px;padding:5px 9px;font-size:12.5px;flex:1;min-width:130px;outline:none}
+    .mcpIn:focus{border-color:var(--accent)}
+    .mcpGrid{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
+  </style>
+  <section>
+    <h3>外部能力（MCP）</h3>
+    <p class="note">
+      MCP 是 AI 工具的通用标准，社区里有大量现成的服务（文件、搜索、数据库、GitHub、浏览器…）。
+      在这里接上任意一个，<b>它的工具会立刻变成 AI 能用的工具</b> —— 不用写插件，也不用改代码。<br>
+      命令一般长这样：<code class="k">npx -y @modelcontextprotocol/server-filesystem 某个本地目录的绝对路径</code>
+    </p>
+    <div id="mcpList"><p class="note">加载中…</p></div>
+
+    <div style="margin-top:12px">
+      <div class="mcpGrid">
+        <input class="mcpIn" id="mcpName" placeholder="服务名（英文，如 filesystem）" style="flex:0 0 200px">
+        <input class="mcpIn" id="mcpCmd" placeholder="启动命令，如 npx / python">
+      </div>
+      <div class="mcpGrid">
+        <input class="mcpIn" id="mcpArgs" placeholder="参数（空格分隔）">
+        <input class="mcpIn" id="mcpCwd" placeholder="工作目录（可留空）" style="flex:0 0 200px">
+      </div>
+      <div class="mcpGrid">
+        <button class="ok" id="mcpAdd">＋ 添加并连接</button>
+        <button class="btn" id="mcpRefresh" title="把已配置的服务全部重连一次">⟳ 全部重连</button>
+        <button class="btn" id="mcpDemo" title="把自带的示例服务接进来，验证链路通不通">⚡ 接入示例服务</button>
+      </div>
+      <p class="note" id="mcpMsg" style="margin-top:8px"></p>
+    </div>
+  </section>
+
+  <section>
+    <h3>本机的 DeepSeek Harness 插件</h3>
+    <p class="note" id="dshNote">扫描中…</p>
+    <div id="dshList"></div>
+  </section>
+</div>
+
+    <!-- ---------- 高级与分享 ---------- -->
+    <div class="tabpane" data-p="adv">
+      <section>
+        <h3>分享给别人</h3>
+        <p class="note">
+          打包这个文件夹发出去之前，确认两件事：<br>
+          ① <code class="k">config.json</code> 不要带出去 —— <b>里面有你的 API Key</b>；<br>
+          ② 对方第一次启动会自动生成一份<b>空配置</b>，自己填接口和 Key 就能用。
+        </p>
+        <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+          <button class="btn" id="advExport">导出干净配置模板</button>
+          <button class="btn" id="advCheck">检查配置状态</button>
+        </div>
+        <p class="note" id="advState"></p>
+      </section>
+      <section>
+        <h3>关于</h3>
+        <p class="note">
+          多 AI 工作台 V0.1 —— 让几个 AI 在同一个群里各带工具、各有人设地一起干活。<br>
+          会话记录在 <code class="k">sessions/</code>，共享记忆在 <code class="k">shared/</code>，
+          插件在 <code class="k">plugins/</code>。
+        </p>
+      </section>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============ 成员编辑弹窗 ============ -->
+<div id="amask"><div id="amodal">
+  <div class="amtop">
+    <span id="amTitle">添加 AI 成员</span>
+    <div class="spacer"></div>
+    <button class="btn" id="amClose">关闭</button>
+  </div>
+  <div class="ambody">
+    <div class="amsec">身份</div>
+    <div class="amrow"><label>名字</label>
+      <input id="afName" placeholder="聊天里用它点名，必填"></div>
+    <div class="amrow2">
+      <div class="amrow"><label>标志</label>
+        <input id="afEmoji" placeholder="🤖"></div>
+      <div class="amrow"><label>身份色</label>
+        <input type="color" id="afColor" value="#2563eb"></div>
+    </div>
+    <div class="amrow"><label>群聊身份</label>
+      <select id="afRole">
+        <option value="peer">平权 · 该接话就接</option>
+        <option value="lead">组长 · 派工必到</option>
+        <option value="audience">旁听 · 只被点名才说</option>
+      </select></div>
+    <div class="amrow"><label>标识 key</label>
+      <input id="afKey" placeholder="英文标识，留空自动生成（建好后不可改）"></div>
+    <div class="amrow"><label>记忆前缀</label>
+      <input id="afPrefix" placeholder="共享记忆里它只写自己前缀的文件，如 N_"></div>
+    <div class="amrow"><label>工作区目录</label>
+      <input id="afWorkspace" placeholder="留空自动建 ws_&lt;key&gt;，可填任意路径"></div>
+    <div class="amrow" style="align-items:flex-start">
+      <label style="padding-top:5px">人设文件</label>
+      <textarea id="afPersonas" rows="3" placeholder="每行一个 .md 路径；文件不存在会自动跳过，不报错"></textarea>
+    </div>
+    <p class="note">人设文件决定它的人格（SOUL / IDENTITY / USER 这类 md，可多个）；不填就是个通用助手。</p>
+
+    <div class="amsec">接口（外接平台）</div>
+    <p class="note">留空 = 用「AI 成员与模型」里的默认接口。选一个服务商，地址和常用模型会自动填好。</p>
+    <div class="amrow"><label>服务商</label>
+      <select id="afPreset">
+        <option value="">— 手动填（下面自己写地址）—</option>
+      </select></div>
+    <div class="amrow"><label>接口地址</label>
+      <input id="afBaseUrl" placeholder="选了服务商会自动填"></div>
+    <div class="amrow"><label>API Key</label>
+      <input id="afApiKey" type="password" autocomplete="off"
+             placeholder="留空=用默认接口的 Key">
+      <button class="btn" type="button" data-eye="afApiKey" title="显示 / 隐藏"
+              style="flex:0 0 auto;padding:4px 9px">👁</button></div>
+    <div class="amrow"><label>模型名</label>
+      <input id="afModel" list="afModelList" placeholder="选了服务商会自动填"></div>
+    <datalist id="afModelList"></datalist>
+    <div class="amrow"><label></label>
+      <div style="flex:1">
+        <button class="btn" id="afFetchModels" title="用上面填的 Key 去问服务商要「可用模型列表」">⟳ 拉取可用模型</button>
+      </div></div>
+    <p class="note" id="afPresetNote"></p>
+    <p class="note" id="afModelState"></p>
+
+    <div id="amEngineWrap">
+      <div class="amsec">工作引擎</div>
+      <div class="amrow"><label>用哪种</label>
+        <div class="seg" id="afEngine">
+          <button data-v="api">接口引擎（内置）</button>
+          <button data-v="command">外部命令</button>
+        </div></div>
+      <div id="afCmdWrap" style="display:none">
+        <div class="amrow"><label>命令</label>
+          <input id="afCmd" placeholder='claude -p "{prompt}"  或只写命令名走 stdin'></div>
+        <div class="amrow"><label>工作目录</label>
+          <input id="afCwd" placeholder="留空 = 工作台目录"></div>
+        <div class="amrow"><label>超时(秒)</label>
+          <input id="afTimeout" placeholder="300"></div>
+        <div class="amrow" style="align-items:flex-start"><label>环境变量</label>
+          <textarea id="afEnv" rows="2" placeholder="每行一个 KEY=VALUE，可留空"></textarea></div>
+        <div class="amrow" style="align-items:flex-start"><label>本机 CLI</label>
+          <div id="afDetectBox" style="flex:1">
+            <button class="btn" id="afDetect">探测本机装了哪些</button></div></div>
+        <p class="note">
+          写 <code class="k">{prompt}</code> → 走命令行参数；不写 → 从 stdin 喂进去。
+          能挂 DSH、Claude Code、Codex、你自己的脚本 —— 回复取它的 stdout。<br>
+          <b>⚠️ 这条命令会在你电脑上直接执行</b>，只填自己信得过的。
+        </p>
+      </div>
+      <p class="note" id="afEngineNote"></p>
+    </div>
+
+    <div class="amfoot">
+      <button class="btn danger" id="amDelete" style="display:none">删除成员</button>
+      <div class="spacer"></div>
+      <button class="btn ok" id="amSave">保存</button>
+    </div>
+  </div>
+</div></div>
+
+<!-- ============ 插件面板 / 开发指南 ============ -->
+<div id="pmask"><div id="pmodal">
+  <div class="pmtop">
+    <span id="pmTitle">插件面板</span>
+    <div class="spacer"></div>
+    <button class="btn" id="pmReloadFrame" title="重新载入面板">⟳</button>
+    <button class="btn" id="pmClose">关闭</button>
+  </div>
+  <div class="pmbody" id="pmBody"></div>
+</div></div>
+
+<script>
+/* ---- 全局错误捕获：出错时在页面顶部弹红条，方便定位与反馈 ---- */
+function showFatal(msg){
+  let bar=document.getElementById('errbar');
+  if(!bar){
+    bar=document.createElement('div'); bar.id='errbar';
+    bar.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99;'+
+      'background:#b91c1c;color:#fff;padding:8px 14px;font-size:12.5px;'+
+      'font-family:Consolas,monospace;white-space:pre-wrap;cursor:pointer';
+    bar.title='点击关闭';
+    bar.onclick=function(){ this.style.display='none'; };
+    document.body.appendChild(bar);
+  }
+  bar.textContent='⚠ 前端错误：'+msg+'　（点此关闭，把这段原文发给开发者）';
+  bar.style.display='block';
+}
+window.addEventListener('error', e=>
+  showFatal((e.message||'未知')+' @'+(String(e.filename||'').split('/').pop())+':'+(e.lineno||'?')));
+window.addEventListener('unhandledrejection', e=>
+  showFatal('未处理的异步错误：'+((e.reason && e.reason.message) || e.reason)));
+
+const chat   = document.getElementById('chat');
+const msgEl  = document.getElementById('msg');
+const sendBtn= document.getElementById('send');
+const sidEl  = {value:'default'};   // 当前会话 id（会话切换在设置抽屉里）
+const placeholder = document.getElementById('chatPlaceholder');
+const drawer = document.getElementById('drawer');
+const mask   = document.getElementById('mask');
+let busy = false, S = null;
+
+let AGENTS = [];                       // AI 成员名单（/api/agents）
+let conv = null;                       // 当前会话：{type:'single',key} 或 {type:'group',name}
+const LABEL = {user:'你'};             // 显示名（agent 的名字由名单动态补进来）
+const ACCENTS = ['#2563eb','#0d9488','#6d28d9','#b45309','#be185d','#374151'];
+
+/* ============ 工具函数 ============ */
+function hexRgb(hex){
+  const c = (hex||'#2563eb').replace('#','');
+  return [parseInt(c.substr(0,2),16),parseInt(c.substr(2,2),16),parseInt(c.substr(4,2),16)];
+}
+function isLight(hex){ const [r,g,b]=hexRgb(hex); return (0.299*r+0.587*g+0.114*b) > 150; }
+function agentCol(a){
+  const hex = a.color || '#6d28d9';
+  let rgb = hexRgb(hex);
+  if(document.body.dataset.theme === 'dark' && !isLight(hex))
+    rgb = rgb.map(v => Math.round(v + (255 - v) * 0.42));
+  return {c: 'rgb(' + rgb.join(',') + ')', rgb: rgb.join(',')};
+}
+function mkAva(key, sm){
+  const d = document.createElement('div'); d.className = 'gava' + (sm ? ' sm' : '');
+  const a = AGENTS.find(x => x.key === key);
+  if(key === 'user' || !a){
+    d.style.background = 'var(--accent)'; d.textContent = '🙂';
+  }else{
+    d.style.background = agentCol(a).c;
+    d.textContent = a.emoji || '🤖';
+    if(isLight(a.color || '#6d28d9')) d.style.color = '#1a1407';
+  }
+  return d;
+}
+function agentByName(n){ return AGENTS.find(x => x.name === n); }
+function groupAgents(g){
+  /* 已存群聊的成员（过滤掉已删除的）；空则全员 */
+  const ks = (g.agents || []).filter(k => AGENTS.some(a => a.key === k));
+  return ks.length ? ks : AGENTS.map(a => a.key);
+}
+function curGroup(){
+  return conv && conv.type === 'group'
+    ? ((S && S.groups || []).find(g => g.name === conv.name) || null) : null;
+}
+function scroll(){ if(!S || S.autoScroll!==false) chat.scrollTop=chat.scrollHeight; }
+
+/* ============ 设置 ============ */
+function applySettings(s){
+  S = s;
+  const de = document.documentElement, b = document.body;
+  b.dataset.theme = s.theme;
+  b.dataset.round = s.round;
+  de.style.setProperty('--accent', s.accent);
+  de.style.setProperty('--accent-rgb', hexRgb(s.accent).join(','));
+  de.style.setProperty('--on-accent', isLight(s.accent) ? '#1a1407' : '#ffffff');
+  de.style.setProperty('--fs', s.fontSize + 'px');
+  de.style.setProperty('--lh', s.lineHeight);
+  de.style.setProperty('--mw', s.msgWidth + '%');
+  de.style.setProperty('--ga', s.gradAlpha);
+  de.style.setProperty('--gw', s.gradWidth + '%');
+  b.classList.toggle('nobar', !s.showBar);
+  b.classList.toggle('noThink', !(s.showThink!==false));
+  syncSetUI();
+}
+function patch(patchObj){ S = Object.assign(S, patchObj); applySettings(S); save(S); }
+let saveTimer=null;
+function save(s){ clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>fetch('/api/settings',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(s)}),250); }
+
+function syncSetUI(){
+  if(!S) return;
+  const pick=(id,v)=>document.querySelectorAll('#'+id+' button')
+    .forEach(b=>b.classList.toggle('active', b.dataset.v===String(v)));
+  pick('setTheme',S.theme); pick('setRound',S.round);
+  const sw=document.getElementById('setAccent');
+  sw.innerHTML='';
+  ACCENTS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='sw'+(c.toLowerCase()===String(S.accent).toLowerCase()?' on':'');
+    d.style.background=c; d.onclick=()=>patch({accent:c});
+    sw.appendChild(d);
+  });
+  document.getElementById('setGa').value = Math.round(S.gradAlpha*100);
+  document.getElementById('gaVal').textContent = S.gradAlpha;
+  document.getElementById('setGw').value = S.gradWidth;
+  document.getElementById('gwVal').textContent = S.gradWidth+'%';
+  document.getElementById('setFs').value = S.fontSize;
+  document.getElementById('fsVal').textContent = S.fontSize+'px';
+  document.getElementById('setLh').value = S.lineHeight;
+  document.getElementById('lhVal').textContent = S.lineHeight;
+  document.getElementById('setMw').value = S.msgWidth;
+  document.getElementById('mwVal').textContent = S.msgWidth+'%';
+  document.getElementById('setBar').checked  = !!S.showBar;
+  const hdEl=document.getElementById('setHead'); if(hdEl) hdEl.checked = (S.showHead!==false);
+  const tkEl=document.getElementById('setThink'); if(tkEl) tkEl.checked = (S.showThink!==false);
+  document.getElementById('setTools').checked= !!S.showTools;
+  document.getElementById('setToolsOpen').checked = !!S.toolsOpen;
+  document.getElementById('setScroll').checked= !!S.autoScroll;
+  const dcEl=document.getElementById('setDecide'); if(dcEl) dcEl.checked = (S.groupDecide!==false);
+  updateModelPrice();
+}
+
+async function loadSettings(){
+  if(location.protocol==='file:'){
+    showFatal('这个页面是以「本地文件」方式打开的，后端接口用不了。'+
+      '请改用浏览器访问 http://localhost:7860 （当前地址：'+location.href+'）');
+    return false;
+  }
+  try{
+    const r = await fetch('/api/settings');
+    const t = await r.text();
+    if(!r.ok) throw new Error('服务返回 HTTP '+r.status);
+    if(!t)     throw new Error('服务返回了空响应');
+    applySettings(JSON.parse(t));
+    return true;
+  }catch(e){
+    showFatal('连不上后端服务（'+e.message+'）。'+
+      '请确认服务已启动（双击 start.bat），并用浏览器访问 http://localhost:7860 '+
+      '（当前地址：'+location.href+'）');
+    return false;
+  }
+}
+
+/* 设置项事件 */
+document.querySelectorAll('#setTheme button').forEach(b=>b.onclick=()=>patch({theme:b.dataset.v}));
+document.querySelectorAll('#setRound button').forEach(b=>b.onclick=()=>patch({round:b.dataset.v}));
+/* 工作引擎的切换在成员编辑弹窗里（#afEngine），按成员各自配置，没有全局开关 */
+document.getElementById('setGa').oninput = e=>patch({gradAlpha: e.target.value/100});
+document.getElementById('setGw').oninput = e=>patch({gradWidth: +e.target.value});
+document.getElementById('setFs').oninput = e=>patch({fontSize:+e.target.value});
+document.getElementById('setLh').oninput = e=>patch({lineHeight:+e.target.value});
+document.getElementById('setMw').oninput = e=>patch({msgWidth:+e.target.value});
+document.getElementById('setBar').onchange   = e=>patch({showBar:e.target.checked});
+const hdEl2=document.getElementById('setHead');
+if(hdEl2) hdEl2.onchange = e=>patch({showHead:e.target.checked});
+const tkEl2=document.getElementById('setThink');
+if(tkEl2) tkEl2.onchange = e=>patch({showThink:e.target.checked});
+document.getElementById('setTools').onchange = e=>patch({showTools:e.target.checked});
+document.getElementById('setToolsOpen').onchange = e=>patch({toolsOpen:e.target.checked});
+document.getElementById('setScroll').onchange= e=>patch({autoScroll:e.target.checked});
+const dcEl2=document.getElementById('setDecide');
+if(dcEl2) dcEl2.onchange = e=>patch({groupDecide:e.target.checked});
+
+/* ---- 模型选择 ---- */
+let MODELS = {catalog:{}, default:'deepseek-chat'};
+function fmtPrice(m){
+  if(!m) return '';
+  return `输入 ¥${m.price_in}/百万 · 输出 ¥${m.price_out}/百万`;
+}
+async function loadModels(){
+  try{ const r = await fetch('/api/models'); if(r.ok) MODELS = await r.json(); }catch(e){}
+  renderModelRows();
+  if(S) syncSetUI();
+}
+function renderModelRows(){
+  const box=document.getElementById('modelRows'); if(!box) return;
+  box.innerHTML='';
+  AGENTS.forEach(a=>{
+    const row=document.createElement('div'); row.className='row';
+    const lab=document.createElement('label'); lab.textContent=a.emoji+' '+a.name+' 模型';
+    row.appendChild(lab);
+    if(a.provider && a.provider.base_url){        // 外部平台（GPT / Kimi / GLM…）：用它自己的模型名
+      const sp=document.createElement('span');
+      sp.className='note'; sp.style.margin='0';
+      sp.innerHTML='外部平台 · <b>'+(a.model||'—')+'</b>　<span style="opacity:.75">在「AI 成员管理 → 接口」里改</span>';
+      row.appendChild(sp); box.appendChild(row); return;
+    }
+    const sel=document.createElement('select');
+    Object.values(MODELS.catalog).forEach(m=>{
+      const o=document.createElement('option');
+      o.value=m.id; o.textContent=m.label;
+      sel.appendChild(o);
+    });
+    sel.value=(S&&S[a.key+'_model'])||MODELS.default;
+    sel.onchange=()=>{ const p={}; p[a.key+'_model']=sel.value; patch(p); };
+    row.appendChild(sel); box.appendChild(row);
+  });
+  updateModelPrice();
+}
+function updateModelPrice(){
+  const el=document.getElementById('modelPrice'); if(!el) return;
+  const parts=[];
+  AGENTS.forEach(a=>{
+    if(a.provider && a.provider.base_url){
+      parts.push(`${a.emoji} ${a.name}：<b>${a.model||'外部平台'}</b> — 按该平台官方价计费`);
+      return;
+    }
+    const id=(S&&S[a.key+'_model'])||MODELS.default; const m=MODELS.catalog[id];
+    if(m) parts.push(`${a.emoji} ${a.name}：<b>${m.label}</b> — ${fmtPrice(m)}`);
+  });
+  el.innerHTML=parts.join('；');
+  const en=document.getElementById('engineNote');
+  if(en) en.innerHTML='ℹ️ 这里选的是「接口引擎」用的模型。若某个成员在自己的「编辑 → 工作引擎」里选了<b>外部命令</b>，它用哪个模型由那条命令自己决定，与这里无关。';
+}
+
+/* ============ 成员名单 ============ */
+async function loadAgents(){
+  try{ const r = await fetch('/api/agents'); if(r.ok) AGENTS = (await r.json()).agents || []; }catch(e){}
+  AGENTS.forEach(a => { LABEL[a.key] = a.name; });
+  renderChatList(); renderAgents(); renderModelRows();
+}
+async function refreshAgents(){
+  try{ const r = await fetch('/api/agents'); if(r.ok) AGENTS = (await r.json()).agents || []; }catch(e){}
+  AGENTS.forEach(a => { LABEL[a.key] = a.name; });
+  try{ if(typeof syncPlaceholder==='function') syncPlaceholder(); }catch(e){}
+  renderChatList(); renderAgents(); renderModelRows();
+  /* 当前会话若指向已删除的成员/群，退回第一个单聊 */
+  if(conv && conv.type === 'single' && !AGENTS.some(a => a.key === conv.key)) conv = null;
+  if(!conv && AGENTS.length) openConv({type:'single', key:AGENTS[0].key});
+  else openConv(conv);   // 重新渲染当前会话（名字/头像可能变了）
+}
+
+/* ============ 聊天列表 ============ */
+function renderChatList(){
+  const box=document.getElementById('clistItems'); box.innerHTML='';
+  /* -- 单聊（每个 AI 一项） -- */
+  const sec1=document.createElement('div'); sec1.className='csec'; sec1.textContent='单聊';
+  box.appendChild(sec1);
+  AGENTS.forEach(a=>{
+    const it=document.createElement('div');
+    it.className='citem'+(conv&&conv.type==='single'&&conv.key===a.key?' on':'');
+    it.appendChild(mkAva(a.key, true));
+    const nm=document.createElement('div'); nm.className='cnm';
+    nm.innerHTML=''; nm.textContent=a.name;
+    const sm=document.createElement('small'); sm.textContent=a.emoji||'';
+    nm.appendChild(sm);
+    it.appendChild(nm);
+    it.onclick=()=>openConv({type:'single', key:a.key});
+    box.appendChild(it);
+  });
+  /* -- 群聊（已存群聊） -- */
+  const groups=(S&&S.groups)||[];
+  const sec2=document.createElement('div'); sec2.className='csec'; sec2.textContent='群聊';
+  box.appendChild(sec2);
+  if(!groups.length){
+    const tip=document.createElement('div'); tip.className='csec';
+    tip.textContent='（点上方 ＋ 创建群聊）';
+    box.appendChild(tip);
+  }
+  groups.forEach(g=>{
+    const it=document.createElement('div');
+    it.className='citem'+(conv&&conv.type==='group'&&conv.name===g.name?' on':'');
+    /* 群头像：取成员 emoji 拼两个 */
+    const av=document.createElement('div'); av.className='gava sm';
+    av.style.background='linear-gradient(135deg,#64748b,#334155)';
+    const ems=groupAgents(g).slice(0,2).map(k=>{ const a=AGENTS.find(x=>x.key===k); return a?(a.emoji||'🤖'):''; });
+    av.textContent=ems.join('')||'👥'; av.style.fontSize='13px';
+    it.appendChild(av);
+    const nm=document.createElement('div'); nm.className='cnm'; nm.textContent=g.name;
+    it.appendChild(nm);
+    const del=document.createElement('button'); del.className='del'; del.textContent='✕';
+    del.title='删除这个群（成员与记录不受影响）';
+    del.onclick=async e=>{
+      e.stopPropagation();
+      if(!confirm('删除群聊「'+g.name+'」？成员和聊天记录都不受影响。'))return;
+      patch({groups:(S.groups||[]).filter(x=>x.name!==g.name)});
+      if(conv&&conv.type==='group'&&conv.name===g.name){ conv=null; showConvShell(false); }
+      renderChatList();
+    };
+    it.appendChild(del);
+    it.onclick=()=>openConv({type:'group', name:g.name});
+    box.appendChild(it);
+  });
+
+}
+
+/* ============ 打开会话 ============ */
+/* 空工作台：没有成员时，聊天区给出「添加第一个 AI」的引导 */
+function syncPlaceholder(){
+  if(!placeholder) return;
+  if(AGENTS.length){
+    placeholder.textContent = '← 从左侧选择一个聊天开始';
+    return;
+  }
+  placeholder.innerHTML =
+    '<div style="text-align:center;max-width:430px;line-height:1.75">'+
+    '<div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:7px">工作台还是空的</div>'+
+    '先加一个 AI 成员，填上你自己的接口和 API Key，就能开聊。<br>'+
+    '任何 <b>OpenAI 兼容</b>的平台都行：DeepSeek / GPT / Kimi / GLM / 通义…'+
+    '<div style="margin-top:14px"><button class="btn ok" id="emptyAddAi">＋ 添加第一个 AI</button></div>'+
+    '</div>';
+  const b=document.getElementById('emptyAddAi');
+  if(b) b.onclick=()=>{ openDrawer(); showTab('ai'); openAgentModal(''); };
+}
+
+function showConvShell(on){
+  document.getElementById('chead').style.display = on?'flex':'none';
+  document.getElementById('inputbar').style.display = on?'flex':'none';
+  placeholder.style.display = on?'none':'flex';
+}
+function openConv(c){
+  if(!c) { showConvShell(false); renderChatList(); return; }
+  abortNow();
+  conv=c;
+  patch({lastConv:c});
+  /* 顶栏：头像 + 名字 + 副标题 */
+  const ha=document.getElementById('cheadAva'); ha.innerHTML='';
+  const cn=document.getElementById('cheadName'), cs=document.getElementById('cheadSub');
+  if(c.type==='single'){
+    const a=AGENTS.find(x=>x.key===c.key);
+    ha.appendChild(mkAva(c.key, true));
+    cn.textContent=a ? a.name : (LABEL[c.key]||c.key);
+    const mid=(S&&S[c.key+'_model'])||MODELS.default;
+    const m=MODELS.catalog[mid];
+    cs.textContent=(a?a.emoji||'':'')+(m?' · '+m.label:'');
+  }else{
+    const g=curGroup();
+    const ks=g?groupAgents(g):[];
+    ha.innerHTML=''; ha.appendChild(mkAva('group'));
+    const av=ha.firstChild;
+    const ems=ks.slice(0,2).map(k=>{ const a=AGENTS.find(x=>x.key===k); return a?(a.emoji||'🤖'):''; });
+    av.textContent=ems.join('')||'👥';
+    cn.textContent=c.name;
+    cs.textContent=(ks.length+1)+'人 · '+ks.map(k=>LABEL[k]||k).join(' ');
+  }
+  if(allSpeakBtn){
+    allSpeakBtn.style.display = c.type==='group' ? 'inline' : 'none';
+    if(c.type==='group') syncAllSpeakBtn();
+  }
+  showConvShell(true);
+  renderChatList();
+  loadHistory();
+  const _ch=document.getElementById('chead');
+  if(_ch && !document.getElementById('ftBtn')){
+    const _b=document.createElement('button'); _b.id='ftBtn'; _b.title='产出文件';
+    _b.textContent='\u{1F4C1}';
+    _b.onclick=()=>toggleFileTree();
+    _ch.appendChild(_b);
+  }
+}
+
+/* ============ 建群弹窗 ============ */
+const gmask=document.getElementById('gmask');
+document.getElementById('addBtn').onclick=()=>{
+  if(!AGENTS.length){ alert('还没有 AI 成员——先到 设置 → AI 成员管理 里添加。'); return; }
+  const list=document.getElementById('gmList'); list.innerHTML='';
+  AGENTS.forEach(a=>{
+    const r=document.createElement('label'); r.className='mrow';
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.value=a.key;
+    r.appendChild(cb); r.appendChild(mkAva(a.key, true));
+    r.appendChild(document.createTextNode(a.name+' '+(a.emoji||'')));
+    list.appendChild(r);
+  });
+  const n=((S&&S.groups)||[]).length+1;
+  document.getElementById('gnName').value='';
+  document.getElementById('gnName').placeholder='群名称（可留空，自动命名：群聊'+n+'）';
+  gmask.classList.add('on');
+};
+document.getElementById('gmCancel').onclick=()=>gmask.classList.remove('on');
+gmask.onclick=e=>{ if(e.target===gmask) gmask.classList.remove('on'); };
+document.getElementById('gmOk').onclick=()=>{
+  const sel=[...document.querySelectorAll('#gmList input:checked')].map(i=>i.value);
+  if(!sel.length){ alert('至少选一个 AI 进群'); return; }
+  const groups=(S&&S.groups)||[];
+  let name=document.getElementById('gnName').value.trim();
+  if(!name){
+    let i=groups.length+1;
+    while(groups.some(g=>g.name==='群聊'+i)) i++;
+    name='群聊'+i;
+  }
+  if(groups.some(g=>g.name===name)){ alert('已有同名群聊「'+name+'」，换个名字。'); return; }
+  patch({groups:[...groups,{name, agents:sel}]});
+  gmask.classList.remove('on');
+  openConv({type:'group', name});
+};
+
+/* ============ 消息渲染（单聊/群聊共用头像气泡） ============ */
+function isGroupConv(){ return conv && conv.type==='group'; }
+function msgBody(el){
+  return (el && el.classList && el.classList.contains('body')) ? el
+       : (el ? el.querySelector('.body') : null);
+}
+function mkGRow(key, isUser){
+  const row = document.createElement('div');
+  row.className = 'gmsg' + (isUser ? ' user' : '');
+  row.appendChild(mkAva(isUser ? 'user' : key));
+  const col = document.createElement('div'); col.className = 'gcol';
+  /* 群聊显示名字（可在设置里关）；单聊不显示 */
+  if(isGroupConv() && !isUser && (S && S.showHead!==false)){
+    const nm = document.createElement('div'); nm.className = 'gname';
+    nm.textContent = LABEL[key] || key;
+    col.appendChild(nm);
+  }
+  row.appendChild(col);
+  return {row, col};
+}
+function addMsg(role, ai, text){
+  const isUser = role === 'user';
+  const r = mkGRow(ai, isUser);
+  const b = document.createElement('div');
+  b.className = 'gbody body';
+  if(!isUser){
+    const a = AGENTS.find(x => x.key === ai);
+    b.style.setProperty('--ai-c', a ? agentCol(a).c : 'var(--muted)');
+    b.style.setProperty('--ai-rgb', a ? agentCol(a).rgb : '107,114,128');
+    r.row.classList.add('ai');
+  }
+  b.textContent = text || '';
+  r.col.appendChild(b);
+  chat.appendChild(r.row); scroll();
+  return b;   /* 返回气泡本体，流式追加直接用它 */
+}
+/* ===== 文件卡片：AI 写出来的文件不再是「只有一行路径」 ===== */
+function _fExt(n){ return ((n||'').split('.').pop()||'').toLowerCase(); }
+function fileIcon(n){
+  const e = _fExt(n);
+  const M = {png:'🖼',jpg:'🖼',jpeg:'🖼',gif:'🖼',webp:'🖼',svg:'🖼',bmp:'🖼',ico:'🖼',
+             md:'📝',txt:'📝',log:'📝',csv:'📊',xlsx:'📊',xls:'📊',pdf:'📕',doc:'📕',docx:'📕',
+             zip:'🗜',rar:'🗜','7z':'🗜',mp4:'🎬',mov:'🎬',webm:'🎬',mp3:'🎵',wav:'🎵'};
+  return M[e] || '📄';
+}
+function isImgFile(n){ return ['png','jpg','jpeg','gif','webp','bmp','svg','ico'].includes(_fExt(n)); }
+function fsize(b){
+  b = b || 0;
+  if(b < 1024) return b + ' B';
+  if(b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+function fileUrl(f, extra){
+  return '/api/file?path=' + encodeURIComponent(f.path) + (extra || '');
+}
+function mkFiles(files){
+  const wrap = document.createElement('div');
+  wrap.className = 'files';
+  (files||[]).forEach(f => {
+    const c = document.createElement('div');
+    c.className = 'fcard' + (f.served ? '' : ' deny');
+    const tip = f.missing ? '文件已不存在'
+                          : (fsize(f.size) + (f.served ? '' : ' · 不在工作区，无法预览'));
+    c.innerHTML = '<span class="fi">' + fileIcon(f.name) + '</span>' +
+      '<span class="fm"><span class="fn"></span><span class="fs"></span></span>';
+    c.querySelector('.fn').textContent = f.name;
+    c.querySelector('.fs').textContent = tip;
+    const act = document.createElement('span'); act.className = 'fa';
+    if(f.served){
+      const b1 = document.createElement('button'); b1.textContent = '预览';
+      b1.onclick = e => { e.stopPropagation(); openFilePrev(f); };
+      const b2 = document.createElement('button'); b2.textContent = '下载';
+      b2.onclick = e => { e.stopPropagation(); location.href = fileUrl(f, '&dl=1'); };
+      act.appendChild(b1); act.appendChild(b2);
+    }else{
+      const b3 = document.createElement('button'); b3.textContent = '复制路径';
+      b3.onclick = e => {
+        e.stopPropagation();
+        try{ navigator.clipboard.writeText(f.path); }catch(_){}
+        b3.textContent = '已复制'; setTimeout(()=>{ b3.textContent = '复制路径'; }, 1200);
+      };
+      act.appendChild(b3);
+    }
+    c.appendChild(act);
+    wrap.appendChild(c);
+  });
+  return wrap;
+}
+function closeFilePrev(){ const b=document.getElementById('filePrev'); if(b) b.classList.remove('on'); }
+function openFilePrev(f){
+  const box = document.getElementById('filePrev');
+  const body = document.getElementById('fpBody');
+  document.getElementById('fpName').textContent = f.name + '  ·  ' + fsize(f.size);
+  body.innerHTML = '<div style="opacity:.6">加载中…</div>';
+  document.getElementById('fpDl').onclick = () => { location.href = fileUrl(f, '&dl=1'); };
+  document.getElementById('fpClose').onclick = closeFilePrev;
+  box.onclick = e => { if(e.target === box) closeFilePrev(); };
+  box.classList.add('on');
+  if(isImgFile(f.name)){
+    const im = document.createElement('img');
+    im.src = fileUrl(f);
+    im.onload  = () => { body.innerHTML = ''; body.appendChild(im); };
+    im.onerror = () => { body.innerHTML = '<div style="opacity:.7">图片加载失败</div>'; };
+    return;
+  }
+  fetch(fileUrl(f, '&text=1')).then(r => r.json()).then(d => {
+    if(d && d.kind === 'text'){
+      const pre = document.createElement('pre');
+      pre.textContent = (d.content || '') +
+        (d.truncated ? '\n\n…内容过长，此处只预览前 20 万字符，完整内容请点「下载」' : '');
+      body.innerHTML = ''; body.appendChild(pre);
+    }else{
+      body.innerHTML = '<div style="opacity:.75">' +
+        ((d && d.error) ? ('读取失败：' + d.error) : '这个类型不支持在线预览，请点右上角「下载」。') +
+        '</div>';
+    }
+  }).catch(e => { body.innerHTML = '<div style="opacity:.75">预览失败：' + e + '</div>'; });
+}
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){ closeFilePrev(); }
+});
+setTimeout(()=>{
+  const _fc = document.getElementById('ftClose');
+  if(_fc) _fc.onclick = () => toggleFileTree(false);
+}, 0);
+
+function addUsage(ai, ev){
+  if(!ev || !ev.total_tokens) return;
+  const r = document.createElement('div');
+  r.className = 'usagerow';
+  const parts = [(ev.estimate ? '约 ' : '') + ev.total_tokens.toLocaleString() + ' tokens'];
+  if(ev.prompt_tokens)     parts.push('入 ' + ev.prompt_tokens);
+  if(ev.completion_tokens) parts.push('出 ' + ev.completion_tokens);
+  if(ev.steps)             parts.push(ev.steps + ' 步');
+  if(ev.elapsed)           parts.push(ev.elapsed + 's');
+  if(ev.model)             parts.push(ev.model);
+  if(ev.estimate)          parts.push('估算');
+  r.innerHTML = parts.map(p => '<span class="ubadge">' + p + '</span>').join('');
+  chat.appendChild(r); scroll();
+}
+
+function kb(n){ return n<1024 ? (n+' B')
+  : n<1048576 ? (n/1024).toFixed(1)+' KB' : (n/1048576).toFixed(1)+' MB'; }
+function toggleFileTree(force){
+  const p = document.getElementById('ftPanel');
+  if(!p) return;
+  const on = (force===undefined) ? !p.classList.contains('on') : !!force;
+  p.classList.toggle('on', on);
+  if(on) loadFileTree();
+}
+function _ftRow(name, tip, path, f){
+  const it = document.createElement('div');
+  it.className = 'ftit';
+  it.innerHTML = '<span>' + fileIcon(name) + '</span>'
+    + '<span class="n"></span><span class="s"></span>';
+  it.querySelector('.n').textContent = name;
+  it.querySelector('.s').textContent = tip;
+  it.title = path;
+  it.onclick = () => openFilePrev(f);
+  return it;
+}
+function loadFileTree(){
+  const box = document.getElementById('ftList');
+  if(!box) return;
+  box.innerHTML = '<div style="opacity:.55;font-size:12px;padding:8px">加载中…</div>';
+  const ai  = (conv && conv.type === 'single') ? conv.key : '';
+  const sid = sidEl.value;
+  /* 两路并发：① 本会话 AI 写出来的文件（写在安装目录、桌面也算）
+                ② 工作区全量文件（原来的逻辑） */
+  Promise.all([
+    fetch('/api/session-files?sid=' + encodeURIComponent(sid))
+      .then(r => r.json()).catch(() => ({files:[]})),
+    fetch('/api/ws-files?ai=' + encodeURIComponent(ai))
+      .then(r => r.json()).catch(() => ({files:[]}))
+  ]).then(([sf, wf]) => {
+    const made = (sf && sf.files) || [];
+    const ws   = (wf && wf.files) || [];
+    if(!made.length && !ws.length){
+      box.innerHTML = '<div style="opacity:.55;font-size:12px;padding:8px">'
+        + '暂无产出文件。让 AI 写个文件试试。</div>';
+      return;
+    }
+    box.innerHTML = '';
+    if(made.length){
+      const g = document.createElement('div');
+      g.className = 'ftgrp';
+      g.textContent = '本会话产出（' + made.length + '）';
+      box.appendChild(g);
+      made.forEach(f => {
+        const tip = f.missing ? '文件已不存在'
+                              : (kb(f.size) + (f.t ? ' · ' + String(f.t).slice(5, 16) : ''));
+        box.appendChild(_ftRow(f.name, tip, f.path,
+          {name:f.name, path:f.path, size:f.size, served:!!f.served, missing:!!f.missing}));
+      });
+    }
+    let grp = null;
+    ws.forEach(f => {
+      if(f.root_name !== grp){
+        grp = f.root_name;
+        const g = document.createElement('div');
+        g.className = 'ftgrp';
+        g.textContent = made.length ? ('工作区 · ' + grp) : grp;
+        box.appendChild(g);
+      }
+      box.appendChild(_ftRow(f.rel, kb(f.size), f.path,
+        {name:f.name, path:f.path, size:f.size, served:true, missing:false}));
+    });
+  }).catch(e => { box.innerHTML = '<div style="opacity:.6;font-size:12px;padding:8px">'
+    + '加载失败：' + e + '</div>'; });
+}
+
+function addTool(ai, ev){
+  if(S && S.showTools===false) return;
+  const r = mkGRow(ai, false);
+  const t = document.createElement('div');
+  t.className = 'tool' + (S && S.toolsOpen ? ' open' : '');
+  const _dur = (typeof ev.dur === 'number')
+      ? '<span class="tdur">' + ev.dur.toFixed(2) + 's</span>' : '';
+  t.innerHTML = `<span class="nm">工具 ${ev.name}</span> ${ev.ok?'✓':'✗'} ${_dur} `+
+                `<span style="opacity:.7">${(ev.args&&JSON.stringify(ev.args)||'').slice(0,80)}</span>`;
+  const rr = document.createElement('div'); rr.className = 'r';
+  rr.textContent = ev.result || '';
+  t.appendChild(rr);
+  if(ev.files && ev.files.length) t.appendChild(mkFiles(ev.files));
+  /* 点卡片里的按钮不要顺手把工具卡折叠了 */
+  t.onclick = (e) => { if(e.target.closest('.fcard')) return; t.classList.toggle('open'); };
+  r.col.appendChild(t); chat.appendChild(r.row); scroll();
+}
+let curThink=null;
+/* 历史还原用：独立渲染一个思考块（不占 curThink 那条「流式累积」的通道） */
+function addThinkStatic(ai, text){
+  const r = mkGRow(ai, false);
+  r.row.classList.add('thinkrow');
+  const bodyEl = document.createElement('div');
+  bodyEl.className = 'gthink body collapsed';
+  bodyEl.textContent = text || '';
+  const t = document.createElement('div'); t.className = 'toggle';
+  t.textContent = '展开思考过程';
+  t.onclick = () => { bodyEl.classList.toggle('collapsed');
+    t.textContent = bodyEl.classList.contains('collapsed') ? '展开思考过程' : '收起'; };
+  r.col.appendChild(bodyEl); r.col.appendChild(t);
+  chat.appendChild(r.row);
+}
+function addThink(ai, text){
+  if(!curThink){
+    const r = mkGRow(ai, false);
+    r.row.classList.add('thinkrow');
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'gthink body collapsed';
+    const t = document.createElement('div'); t.className = 'toggle';
+    t.textContent = '展开思考过程';
+    t.onclick = () => { bodyEl.classList.toggle('collapsed');
+      t.textContent = bodyEl.classList.contains('collapsed') ? '展开思考过程' : '收起'; };
+    r.col.appendChild(bodyEl); r.col.appendChild(t);
+    chat.appendChild(r.row);
+    curThink = {el:r.row, body:bodyEl};
+    scroll();
+  }
+  curThink.body.textContent += (text||'');
+  scroll();
+}
+function endThink(){ curThink=null; }
+function sysLine(text){
+  const d=document.createElement('div'); d.className='msg sys'; d.textContent=text;
+  chat.appendChild(d); scroll(); return d;
+}
+function thinkingTip(who){
+  const d=document.createElement('div');
+  d.className='msg sys thinking';
+  d.textContent=(who||'')+' 正在思考…';
+  chat.appendChild(d); scroll(); return d;
+}
+function clearTip(t){ try{ if(t && t.parentNode) t.parentNode.removeChild(t); }catch(e){} }
+
+/* ============ SSE ============ */
+async function readStream(resp, onEvent){
+  const reader=resp.body.getReader(); const dec=new TextDecoder(); let buf='';
+  while(true){
+    const {done,value}=await reader.read(); if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let i; while((i=buf.indexOf('\n\n'))>=0){
+      const c=buf.slice(0,i); buf=buf.slice(i+2);
+      if(c.startsWith('data: ')){ try{ onEvent(JSON.parse(c.slice(6))); }catch(e){} }
+    }
+  }
+}
+function postStream(url, body, h){
+  return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)})
+   .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return readStream(r,h); })
+   .catch(e=>{ sysLine('请求失败：'+e.message+'　（请确认服务在跑、且地址是 http://localhost:7860）'); });
+}
+function setBusy(b){
+  busy=b;
+  if(conv && conv.type==='group'){ sendBtn.disabled=false; msgEl.disabled=false; return; } // 群聊随时可插话
+  sendBtn.disabled=b; msgEl.disabled=b;
+}
+
+msgEl.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); doSend(); }});
+msgEl.addEventListener('input',()=>{                 // 输入框随内容长高（到 150px 为止）
+  msgEl.style.height='auto';
+  msgEl.style.height=Math.min(msgEl.scrollHeight,150)+'px';
+});
+sendBtn.onclick=doSend;
+/* ===== 聊天附件：把文件 / 图片发给 AI ===== */
+let PEND=[];                                   /* 待发送的附件元信息 */
+async function uploadAtt(f){
+  let b64;
+  try{
+    b64 = await new Promise((res,rej)=>{
+      const fr=new FileReader();
+      fr.onload=()=>res(fr.result); fr.onerror=()=>rej(new Error('读取失败'));
+      fr.readAsDataURL(f);
+    });
+  }catch(e){ sysLine('附件读取失败：'+e.message); return null; }
+  const r = await fetch('/api/upload',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:f.name, content:b64})})
+    .then(x=>x.json()).catch(e=>({error:String(e)}));
+  if(!r.ok){ sysLine('附件上传失败：'+(r.error||'未知错误')); return null; }
+  return {name:r.name, path:r.path, size:r.size, kind:r.kind};
+}
+function renderPend(){
+  const box=document.getElementById('attList'); if(!box) return;
+  box.innerHTML='';
+  PEND.forEach((a,i)=>{
+    const d=document.createElement('div'); d.className='pending';
+    if(a.kind==='image'){
+      const im=document.createElement('img');
+      im.src='/api/file?path='+encodeURIComponent(a.path); d.appendChild(im);
+    }else{
+      const s=document.createElement('span'); s.textContent=fileIcon(a.name); d.appendChild(s);
+    }
+    const n=document.createElement('span'); n.className='pn'; n.textContent=a.name; d.appendChild(n);
+    const z=document.createElement('span'); z.className='ps'; z.textContent=fsize(a.size); d.appendChild(z);
+    const b=document.createElement('button'); b.textContent='✕'; b.title='移除这个附件';
+    b.onclick=()=>{ PEND.splice(i,1); renderPend(); };
+    d.appendChild(b);
+    box.appendChild(d);
+  });
+  box.style.display = PEND.length ? 'flex' : 'none';
+}
+async function pickAttach(files){
+  for(const f of (files||[])){
+    if(f.size > 20*1024*1024){ sysLine('文件过大（上限 20MB）：'+f.name); continue; }
+    const btn=document.getElementById('attBtn'); if(btn) btn.classList.add('off');
+    const a = await uploadAtt(f);
+    if(btn) btn.classList.remove('off');
+    if(a){ PEND.push(a); renderPend(); }
+  }
+}
+function takeAtts(){ const a=PEND.slice(); PEND=[]; renderPend(); return a; }
+/* 把附件挂到刚发出去的用户气泡下面 */
+function appendAtts(bub, atts){
+  if(!atts || !atts.length || !bub) return;
+  const w=mkAtts(atts);
+  if(w){ try{ (msgBody(bub)||bub).appendChild(w); }catch(e){} scroll(); }
+}
+function mkAtts(atts){
+  if(!atts||!atts.length) return null;
+  const w=document.createElement('div'); w.className='atts';
+  atts.forEach(a=>{
+    const d=document.createElement('div'); d.className='att';
+    d.title='点击查看';
+    if(a.kind==='image'){
+      const im=document.createElement('img');
+      im.src='/api/file?path='+encodeURIComponent(a.path); d.appendChild(im);
+    }else{
+      const s=document.createElement('span'); s.textContent=fileIcon(a.name); d.appendChild(s);
+    }
+    const n=document.createElement('span');
+    n.textContent=a.name+' · '+fsize(a.size); d.appendChild(n);
+    d.onclick=()=>{ if(a.path) openFilePrev({name:a.name,path:a.path,size:a.size,served:true}); };
+    w.appendChild(d);
+  });
+  return w;
+}
+(function initAtt(){
+  const inp=document.getElementById('attFile');
+  const btn=document.getElementById('attBtn');
+  const ta =document.getElementById('msg');
+  if(btn&&inp){
+    btn.onclick=()=>inp.click();
+    inp.onchange=()=>{ pickAttach(inp.files); inp.value=''; };
+  }
+  /* 直接 Ctrl+V 粘贴截图也能当附件 */
+  if(ta){
+    ta.addEventListener('paste', e=>{
+      const fs=(e.clipboardData && e.clipboardData.files)||[];
+      if(fs.length){ e.preventDefault(); pickAttach(fs); }
+    });
+  }
+})();
+
+function doSend(){
+  const t=msgEl.value.trim();
+  if((!t && !PEND.length) || !conv) return;
+  const atts=takeAtts();
+  conv.type==='group' ? startGroup(t,atts) : startSingle(t,atts);
+}
+
+/* ============ 发送：群聊（可随时插话打断） ============ */
+let abortCtl=null;
+function abortNow(){ if(abortCtl){ try{abortCtl.abort();}catch(e){} abortCtl=null; } }
+function startGroup(text, atts){
+  const g=curGroup();
+  const agents=g?groupAgents(g):AGENTS.map(a=>a.key);
+  abortNow();                       // 插话即打断上一轮
+  abortCtl = new AbortController();
+  msgEl.value='';
+  const _ub=addMsg('user','user',text);
+  appendAtts(_ub, atts);
+  WB.emit('user', {text, mode:'group'});
+  const tip=thinkingTip('');          // 不知道谁会接话，先给个通用反馈
+  const bub={};
+  fetch('/api/group',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({session_id:sidEl.value,message:text,agents,
+                         all_speak:!!(S&&S.allSpeak), attachments:atts||[]}),
+    signal:abortCtl.signal})
+   .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status);
+     return readStream(r,ev=>{
+      if(ev.type==='who'){ endThink(); WB.emit('who',ev); }
+      if(ev.type==='relay'){ endThink(); sysLine('🔁 自动接力（第 '+ev.round+' 轮）：'+(LABEL[ev.ai]||ev.ai)+' 被点名，自动接话'); }
+      if(ev.type==='think'){ clearTip(tip); addThink(ev.ai,ev.text); }
+      if(ev.type==='tool'){ addTool(ev.ai,ev); WB.emit('tool',ev); }
+      if(ev.type==='usage'){ addUsage(ev.ai,ev); WB.emit('usage',ev); }
+      if(ev.type==='token'){
+        clearTip(tip); endThink();
+        if(!bub[ev.ai]) bub[ev.ai]=addMsg('ai',ev.ai,'');
+        msgBody(bub[ev.ai]).textContent += ev.text; scroll();
+      }
+      if(ev.type==='replace'){                       /* 插件 before_send 改过文案 → 覆盖整条 */
+        if(!bub[ev.ai]) bub[ev.ai]=addMsg('ai',ev.ai,'');
+        msgBody(bub[ev.ai]).textContent = ev.text; scroll();
+      }
+      if(ev.type==='done'){ WB.emit('reply',{ai:ev.ai,mode:'group',
+        text:bub[ev.ai]?msgBody(bub[ev.ai]).textContent:''}); }
+      if(ev.type==='error') sysLine('错误：'+ev.text);
+   });})
+   .catch(e=>{ if(e.name!=='AbortError') sysLine('错误：'+e.message); })
+   .finally(()=>{ clearTip(tip); abortCtl=null; });
+}
+
+/* ============ 发送：单聊 ============ */
+function startSingle(text, atts){
+  setBusy(true); const _ub=addMsg('user','user',text); msgEl.value='';
+  appendAtts(_ub, atts);
+  WB.emit('user', {text, mode:'single', ai:conv.key});
+  const tip=thinkingTip(LABEL[conv.key]||'');
+  const bub={};
+  postStream('/api/chat',{ai:conv.key,session_id:sidEl.value,message:text,attachments:atts||[]},ev=>{
+    if(ev.type==='think'){ clearTip(tip); addThink(ev.ai,ev.text); }
+    if(ev.type==='tool'){ addTool(ev.ai,ev); WB.emit('tool',ev); }
+    if(ev.type==='usage'){ addUsage(ev.ai,ev); WB.emit('usage',ev); }
+    if(ev.type==='token'){ clearTip(tip); endThink();
+      if(!bub[ev.ai]) bub[ev.ai]=addMsg('ai',ev.ai,'');
+      msgBody(bub[ev.ai]).textContent += ev.text; scroll(); }
+    if(ev.type==='replace'){                     /* 插件 before_send 改过文案 → 覆盖整条 */
+      if(!bub[ev.ai]) bub[ev.ai]=addMsg('ai',ev.ai,'');
+      msgBody(bub[ev.ai]).textContent = ev.text; scroll(); }
+    if(ev.type==='who') WB.emit('who',ev);
+    if(ev.type==='done') WB.emit('reply',{ai:ev.ai,mode:'single',
+      text:bub[ev.ai]?msgBody(bub[ev.ai]).textContent:''});
+    if(ev.type==='error') sysLine('错误：'+ev.text);
+  }).then(()=>{ clearTip(tip); setBusy(false); });
+}
+
+/* ============ 历史记录 / 会话 ============ */
+/* 还原一条 AI 消息：思考过程 → 工具卡片 → 正文。
+   think / tools 是后端落库时顺带存下的，老会话没有这两个字段，
+   走到这里就是普通气泡，不受影响。 */
+function replayAIMsg(ai, m){
+  if(m.think) addThinkStatic(ai, m.think);
+  (m.tools || []).forEach(t => { try{ addTool(ai, t); }catch(e){} });
+  addMsg('ai', ai, m.content);
+}
+async function loadHistory(){
+  let d;
+  try{ d=await fetch('/api/session/'+encodeURIComponent(sidEl.value)).then(r=>r.json()); }
+  catch(e){ return; }
+  chat.innerHTML='';
+  curThink=null;
+  if(!conv) return;
+  if(conv.type==='group'){
+    (d.group||[]).forEach(m=> m.role==='user' ? addMsg('user','user',m.content)
+                                              : replayAIMsg(m.role, m));
+  }else{
+    (d[conv.key]||[]).forEach(m=> m.role==='user' ? addMsg('user','user',m.content)
+                                                  : replayAIMsg(conv.key, m));
+  }
+  scroll();
+}
+async function loadSessionList(){
+  try{
+    const r=await fetch('/api/sessions').then(x=>x.json());
+    const sel=document.getElementById('sessList'), cur=sidEl.value;
+    sel.innerHTML='';
+    (r.sessions||[]).forEach(s=>{
+      const o=document.createElement('option'); o.value=s.id;
+      const t=(s.updated||s.created||'');
+      let name;
+      if(s.id==='default')      name='主会话';
+      else if(t.length>=16)     name=t.slice(5,16);
+      else                      name=s.id;
+      o.textContent = `${name} · ${s.msgs}条`;
+      sel.appendChild(o);
+    });
+    sel.value=cur;
+    if(sel.value!==cur){
+      const o=document.createElement('option'); o.value=cur;
+      o.textContent='新会话（还没发言）';
+      sel.appendChild(o); sel.value=cur;
+    }
+  }catch(e){}
+}
+document.getElementById('sessList').onchange=e=>{
+  abortNow(); sidEl.value=e.target.value; loadHistory(); };
+document.getElementById('newSess').onclick=()=>{
+  abortNow(); sidEl.value='s'+Date.now(); loadHistory(); loadSessionList(); };
+document.getElementById('clearConv').onclick=async()=>{
+  if(!confirm('确定清空当前会话？这会删除该会话的全部聊天记录（其他会话不受影响）。'))return;
+  abortNow();
+  await fetch('/api/reset',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({session_id:sidEl.value})});
+  loadHistory(); loadSessionList();
+};
+
+/* 「全员必答」开关：仅群聊显示；开=每条消息全员依次回答（原「同时问」），关=智能判定谁接话 */
+const allSpeakBtn=document.getElementById('allSpeakBtn');
+function syncAllSpeakBtn(){
+  if(!allSpeakBtn) return;
+  const on=!!(S&&S.allSpeak);
+  allSpeakBtn.textContent = on ? '⚡ 全员必答：开' : '⚡ 全员必答：关';
+  allSpeakBtn.style.color = on ? 'var(--accent)' : '';
+  allSpeakBtn.style.borderColor = on ? 'var(--accent)' : '';
+}
+allSpeakBtn.onclick=()=>{ patch({allSpeak:!(S&&S.allSpeak)}); syncAllSpeakBtn(); };
+
+/* ============ 设置面板：AI 成员 ============ */
+let SETUP = {agent_ready:{}};
+let DEFPROV = {has_key:false};
+
+async function loadSetup(){
+  try{ const r=await fetch('/api/setup'); if(r.ok) SETUP=await r.json(); }catch(e){}
+}
+function agentReady(k){ const m=SETUP.agent_ready||{}; return m[k]!==false; }
+
+/* ---- 标签页切换 ---- */
+function showTab(name){
+  document.querySelectorAll('#setTabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===name));
+  document.querySelectorAll('#drawer .tabpane').forEach(p=>p.classList.toggle('on', p.dataset.p===name));
+}
+document.querySelectorAll('#setTabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+
+/* ---- 高级与分享：配置体检 + 导出干净模板 ---- */
+document.getElementById('advCheck').onclick = async () => {
+  const st = document.getElementById('advState');
+  st.textContent = '检查中…';
+  await loadSetup();
+  await loadDefaultProvider();
+  if(!AGENTS.length){
+    st.innerHTML = '还没有 AI 成员 —— 到「AI 成员与模型」里点「＋ 添加成员」。';
+    return;
+  }
+  const bad = AGENTS.filter(a => !agentReady(a.key));
+  const defOk = !!DEFPROV.has_key;
+  if(!bad.length){
+    st.innerHTML = '<span class="ready on">全部就绪</span> ' +
+      AGENTS.length + ' 个成员的接口都配好了' +
+      (defOk ? '' : '（默认接口没填 Key，但每个成员都单独配了，不影响）');
+    return;
+  }
+  st.innerHTML = '<span class="ready off">' + bad.length + ' 个没配好</span> ' +
+    bad.map(a => a.emoji + ' ' + a.name).join('、') +
+    ' —— 到「AI 成员与模型」点它的「编辑」填 API Key' +
+    (defOk ? '，或者不填也行（会用默认接口）' : '（默认接口也还没填 Key）') + '。';
+};
+
+document.getElementById('advExport').onclick = () => {
+  const agents = AGENTS.map(a => {
+    const o = {
+      key: a.key, name: a.name, emoji: a.emoji, color: a.color,
+      prefix: a.prefix, workspace: a.workspace,
+      persona_files: a.persona_files || [], model: a.model || 'deepseek-flash',
+    };
+    const p = a.provider || {};
+    if(p.base_url || p.model){
+      o.provider = { base_url: p.base_url || '', api_key: '', model: p.model || '' };
+    }
+    return o;
+  });
+  const cfg = {
+    '//这是什么': '多 AI 工作台配置模板 —— 不含任何 API Key，对方填自己的即可。',
+    deepseek: {
+      '//说明': '默认接口，任何 OpenAI 兼容平台都行。',
+      api_key: '', model: DEFPROV.model || 'deepseek-flash',
+      base_url: DEFPROV.base_url || 'https://api.deepseek.com/v1',
+    },
+    agents,
+    port: 7860, max_tool_rounds: 8,
+    '//注意': 'shared_memory / sessions_dir 不写，程序会按自己的位置自动算。',
+  };
+  const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
+  const a2 = document.createElement('a');
+  a2.href = URL.createObjectURL(blob);
+  a2.download = 'config.example.json';
+  document.body.appendChild(a2); a2.click(); a2.remove();
+  URL.revokeObjectURL(a2.href);
+  const st = document.getElementById('advState');
+  st.innerHTML = '已导出 <code class="k">config.example.json</code>（' + agents.length +
+    ' 个成员，全部 Key 已清空）。把它覆盖项目里那份同名文件即可。';
+};
+
+/* ---- 默认接口（成员没单独配接口时用它） ---- */
+async function loadDefaultProvider(){
+  try{ const r=await fetch('/api/provider'); if(r.ok) DEFPROV=await r.json(); }catch(e){}
+  const bu=document.getElementById('dvBaseUrl'); if(!bu) return;
+  bu.value = DEFPROV.base_url || '';
+  const dps=document.getElementById('dvPreset');
+  if(dps){
+    const hit = PRESETS.find(p => p.base_url && DEFPROV.base_url && p.base_url === DEFPROV.base_url);
+    dps.value = hit ? hit.id : '';
+    applyPreset(dps.value, {note:'dvPresetNote'});
+    bindPresetUI();
+  }
+  document.getElementById('dvModel').value = DEFPROV.model || '';
+  /* Key 回填真实值，靠 type=password 掩码显示：
+     以前这里把输入框清空、只把 Key 塞进灰色 placeholder，用户重新打开设置
+     看见空框就以为 Key 丢了（其实还在 config.json 里），容易误重填。 */
+  const k=document.getElementById('dvKey');
+  k.value = DEFPROV.api_key || '';
+  k.type = 'password';
+  k.placeholder = DEFPROV.has_key
+    ? '已保存（圆点只是隐藏；想清除请填一个 - ）'
+    : '还没配 Key —— 填进去才能和 AI 说话';
+  const st=document.getElementById('dvState');
+  if(st) st.innerHTML = DEFPROV.has_key
+    ? '<span class="ready on">已配置</span>'
+    : '<span class="ready off">未配置</span>';
+}
+document.getElementById('dvSave').onclick=async()=>{
+  const body={ base_url:document.getElementById('dvBaseUrl').value.trim(),
+               model:document.getElementById('dvModel').value.trim() };
+  const k=document.getElementById('dvKey').value.trim();
+  if(k) body.api_key=k;
+  const r=await post('/api/provider', body);
+  if(r.error){ alert(r.error); return; }
+  await loadDefaultProvider();
+  await loadSetup();
+  renderAgents();
+};
+
+/* ---- 成员列表 ---- */
+async function renderAgents(){
+  const box=document.getElementById('agentList'); if(!box) return;
+  box.innerHTML='';
+  if(!AGENTS.length){
+    box.innerHTML='<p class="note">还没有成员。点下面的「＋ 添加成员」加第一个 AI。</p>';
+    return;
+  }
+  AGENTS.forEach(a=>{
+    const d=document.createElement('div'); d.className='plug';
+    const col=agentCol(a);
+    const rdy=agentReady(a.key);
+    const prov = a.provider || null;
+    const eg0 = a.engine || {};
+    const isCmd0 = eg0.type === 'command';
+    const ok0 = isCmd0 ? true : rdy;
+    d.innerHTML =
+      `<div class="ptop"><span class="dot" style="background:${col.c}"></span>`+
+      `<b>${a.emoji} ${a.name}</b><span class="ver">${a.key}</span>`+
+      `<span class="ready ${ok0?'on':'off'}">${ok0?(isCmd0?'外部引擎':'接口就绪'):'未配置接口'}</span></div>`+
+      `<div class="pdesc">工作区：${a.workspace} ｜ 记忆前缀：${a.prefix}`+
+      `<br>引擎：${isCmd0 ? ('外部命令 · '+(eg0.cmd||'')) : '接口引擎（内置）'}`+
+      `<br>接口：${prov && prov.base_url ? prov.base_url : '（用默认接口）'}`+
+      ` ｜ 模型：${(prov&&prov.model) ? prov.model : (a.model||'默认')}`+
+      (prov && (prov.api_key_masked || prov.api_key)
+        ? ` ｜ Key：${prov.api_key_masked || prov.api_key}` : '')+
+      `</div>`;
+    const ops=document.createElement('div'); ops.className='pops';
+    const mk=(txt,fn,warn)=>{ const b=document.createElement('button'); b.textContent=txt;
+      if(warn)b.className='warn'; b.onclick=fn; ops.appendChild(b); return b; };
+    mk('编辑', ()=>openAgentModal(a.key));
+    mk('删除', async()=>{
+      if(!confirm('确定删除「'+a.name+'」？它的聊天记录仍保留在会话文件里。'))return;
+      const r=await post('/api/agents',{action:'delete',key:a.key});
+      if(r.error){ alert(r.error); return; }
+      await refreshAgents(); await loadSetup(); renderAgents(); syncPlaceholder();
+    }, true);
+    d.appendChild(ops);
+    box.appendChild(d);
+  });
+}
+
+/* ---- 成员编辑弹窗（添加 / 编辑共用） ---- */
+const amask = document.getElementById('amask');
+let amEditKey = null;
+const AM = id => document.getElementById(id);
+
+/* ---- 服务商预设：把各家地址和模型名做成下拉，少手敲、少填错 ---- */
+let PRESETS = [];
+async function loadPresets(){
+  try{
+    const r = await fetch('/api/provider-presets');
+    if(r.ok){ const d = await r.json(); PRESETS = d.presets || []; }
+  }catch(e){}
+  const opts = '<option value="">— 手动填（下面自己写地址）—</option>' +
+    PRESETS.map(p => '<option value="' + p.id + '">' + (p.name || p.id) + '</option>').join('');
+  ['dvPreset','afPreset'].forEach(id => {
+    const el = AM(id); if(!el) return;
+    const cur = el.value; el.innerHTML = opts; el.value = cur;
+  });
+  bindPresetUI();
+}
+function presetById(id){ return PRESETS.find(p => p.id === id) || null; }
+function applyPreset(id, o){
+  const p = presetById(id);
+  const noteEl = (o && o.note) ? AM(o.note) : null;
+  if(!p){ if(noteEl) noteEl.innerHTML = ''; return; }
+  if(o && o.base)  AM(o.base).value  = p.base_url || '';
+  if(o && o.model) AM(o.model).value = (p.models && p.models[0]) || '';
+  if(noteEl){
+    let h = p.note || '';
+    if(p.key_url) h += '　<a href="' + p.key_url + '" target="_blank" rel="noopener">去申请 Key ↗</a>';
+    if(!p.models || !p.models.length){
+      h += '　<span class="k">这家的模型名按控制台里的写，不确定就点「拉取可用模型」</span>';
+    }
+    noteEl.innerHTML = h;
+  }
+}
+function fillModelList(id, list){
+  const dl = AM(id); if(!dl) return;
+  dl.innerHTML = (list || []).map(m => '<option value="' + m + '"></option>').join('');
+}
+async function fetchModels(baseSel, keySel, modelSel, stateSel){
+  const st = stateSel ? AM(stateSel) : null;
+  const bEl = baseSel ? AM(baseSel) : null;
+  const kEl = keySel ? AM(keySel) : null;
+  const base = bEl ? (bEl.value || '').trim() : '';
+  const key  = kEl ? (kEl.value || '').trim() : '';
+  if(!base){ if(st) st.textContent = '先选个服务商，或自己填接口地址'; return; }
+  if(!key){
+    if(st) st.innerHTML = '这里没填 Key（成员可能沿用默认接口的 Key）。<b>临时填一下</b>再取，取完不保存也行。';
+    return;
+  }
+  if(st) st.textContent = '正在问服务商要模型列表…';
+  try{
+    const r = await fetch('/api/provider-models', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({base_url: base, api_key: key})
+    });
+    const d = await r.json();
+    if(!d.ok){ if(st) st.textContent = '取不到：' + (d.error || '未知原因'); return; }
+    fillModelList(modelSel === 'dvModel' ? 'dvModelList' : 'afModelList', d.models);
+    const mEl = modelSel ? AM(modelSel) : null;
+    if(mEl && !mEl.value){
+      const first = d.models.find(m => m.indexOf('embedding') < 0 && m.indexOf('rerank') < 0) || d.models[0];
+      if(first) mEl.value = first;
+    }
+    if(st) st.innerHTML = '拿到 <b>' + d.count + '</b> 个 —— 点模型名输入框右边的小箭头就能选';
+  }catch(e){ if(st) st.textContent = '请求失败：' + e; }
+}
+function bindPresetUI(){
+  const dp = AM('dvPreset'), ap = AM('afPreset');
+  if(dp && !dp.dataset.bound){
+    dp.dataset.bound = '1';
+    dp.onchange = () => applyPreset(dp.value, {base:'dvBaseUrl', model:'dvModel', note:'dvPresetNote'});
+  }
+  if(ap && !ap.dataset.bound){
+    ap.dataset.bound = '1';
+    ap.onchange = () => applyPreset(ap.value, {base:'afBaseUrl', model:'afModel', note:'afPresetNote'});
+  }
+  const df = AM('dvFetchModels');
+  if(df && !df.dataset.bound){
+    df.dataset.bound = '1';
+    df.onclick = () => fetchModels('dvBaseUrl', 'dvKey', 'dvModel', 'dvState');
+  }
+  const af = AM('afFetchModels');
+  if(af && !af.dataset.bound){
+    af.dataset.bound = '1';
+    af.onclick = () => fetchModels('afBaseUrl', 'afApiKey', 'afModel', 'afModelState');
+  }
+  /* 👁 显示 / 隐藏 Key：输入框里始终是真实值，只是切换 password ↔ text */
+  document.querySelectorAll('[data-eye]').forEach(b=>{
+    if(b.dataset.bound) return;
+    b.dataset.bound = '1';
+    b.onclick = () => {
+      const i = document.getElementById(b.dataset.eye); if(!i) return;
+      i.type = (i.type === 'password') ? 'text' : 'password';
+      b.textContent = (i.type === 'password') ? '👁' : '🙈';
+    };
+  });
+}
+
+function openAgentModal(key){
+  amEditKey = key || null;
+  const a = key ? AGENTS.find(x=>x.key===key) : null;
+  AM('amTitle').textContent = a ? ('编辑成员：'+a.name) : '添加 AI 成员';
+  AM('afName').value  = a ? a.name : '';
+  AM('afEmoji').value = a ? (a.emoji||'') : '';
+  AM('afColor').value = (a && a.color) || '#2563eb';
+  AM('afKey').value   = a ? a.key : '';
+  AM('afKey').disabled = !!a;
+  AM('afPrefix').value = a ? (a.prefix||'') : '';
+  AM('afWorkspace').value = a ? (a.workspace||'') : '';
+  const pf = a ? (a.persona_files||[]) : [];
+  AM('afPersonas').value = pf.join('\n');
+  AM('afPersonas').placeholder = '每行一个 .md 路径；文件不存在会自动跳过，不报错';
+  AM('afRole').value = (S && S.groupRoles && S.groupRoles[key]) || 'peer';
+  const p = (a && a.provider) || {};
+  AM('afBaseUrl').value = p.base_url || '';
+  AM('afModel').value   = p.model || '';
+  AM('afApiKey').value = p.api_key || '';
+  AM('afApiKey').type  = 'password';   /* 上次可能被 👁 切成明文，开窗时复位 */
+  AM('afApiKey').placeholder = p.api_key
+    ? '已保存（圆点只是隐藏；想清除请填一个 - ）'
+    : '留空=用默认接口的 Key';
+  const aps=AM('afPreset');
+  if(aps){
+    const hit = PRESETS.find(x => x.base_url && p.base_url && x.base_url === p.base_url);
+    aps.value = hit ? hit.id : '';
+    applyPreset(aps.value, {note:'afPresetNote'});
+    bindPresetUI();
+  }
+  /* 工作引擎：接口引擎（内置 harness）或外部命令 */
+  const eg = (a && a.engine) || {type:'api'};
+  const isCmd = eg.type === 'command';
+  document.querySelectorAll('#afEngine button').forEach(b=>
+    b.classList.toggle('active', b.dataset.v === (isCmd ? 'command' : 'api')));
+  AM('afCmdWrap').style.display = isCmd ? 'block' : 'none';
+  AM('afCmd').value = eg.cmd || '';
+  AM('afCwd').value = eg.cwd || '';
+  AM('afTimeout').value = eg.timeout || '';
+  AM('afEnv').value = eg.env ? Object.keys(eg.env).map(k=>k+'='+eg.env[k]).join('\n') : '';
+  AM('afDetectBox').innerHTML = '<button class="btn" id="afDetect">探测本机装了哪些</button>';
+  bindDetect();
+  const enote = AM('afEngineNote');
+  if(eg.legacy) enote.innerHTML = 'ℹ️ 这个成员现在走的是旧版「真身」开关（config.json 的 harness 段）。把命令填到上面并保存，就换成新的引擎配置。';
+  else if(isCmd) enote.innerHTML = '外部命令引擎：不流式，跑完一次返回，命令的 stdout 就是它的回复。';
+  else enote.innerHTML = '接口引擎：工作台内置的 agent 循环 —— 读人设 → 带 key 调接口 → 6 个工具，最多 8 轮。';
+  AM('amDelete').style.display = a ? 'inline-block' : 'none';
+  amask.classList.add('on');
+}
+function closeAgentModal(){ amask.classList.remove('on'); }
+AM('amClose').onclick = closeAgentModal;
+amask.onclick = e => { if(e.target === amask) closeAgentModal(); };
+document.querySelectorAll('#afEngine button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#afEngine button').forEach(x=>x.classList.toggle('active', x===b));
+  AM('afCmdWrap').style.display = (b.dataset.v === 'command') ? 'block' : 'none';
+});
+
+/* 探测本机可当引擎的 CLI，点一下就填进命令框 */
+function bindDetect(){
+  const btn = AM('afDetect'); if(!btn) return;
+  btn.onclick = async ()=>{
+    btn.textContent = '探测中…';
+    try{
+      const r = await (await fetch('/api/agents/detect')).json();
+      const list = r.found || [];
+      const box = AM('afDetectBox'); box.innerHTML = '';
+      if(!list.length){ box.innerHTML = '<span class="note">没探测到可用的 CLI。</span>'; return; }
+      list.forEach(f=>{
+        const b = document.createElement('button');
+        b.className = 'btn'; b.style.margin = '0 5px 6px 0'; b.textContent = f.title;
+        b.title = f.cmd || '';
+        b.onclick = ()=>{
+          AM('afCmd').value = f.cmd || '';
+          if(f.cwd) AM('afCwd').value = f.cwd;
+          if(f.timeout) AM('afTimeout').value = f.timeout;
+          if(f.env) AM('afEnv').value = Object.keys(f.env).map(k=>k+'='+f.env[k]).join('\n');
+          document.querySelectorAll('#afEngine button').forEach(x=>
+            x.classList.toggle('active', x.dataset.v === 'command'));
+          AM('afCmdWrap').style.display = 'block';
+        };
+        box.appendChild(b);
+      });
+      const tip = document.createElement('span');
+      tip.className = 'note'; tip.style.display = 'block'; tip.style.marginTop = '2px';
+      tip.textContent = '点一个填进命令框（填完还能手改）';
+      box.appendChild(tip);
+    }catch(e){ btn.textContent = '探测失败，再点一次'; }
+  };
+}
+AM('amDelete').onclick = async()=>{
+  const a = amEditKey ? AGENTS.find(x=>x.key===amEditKey) : null;
+  if(!a) return;
+  if(!confirm('确定删除「'+a.name+'」？它的聊天记录仍保留在会话文件里。')) return;
+  const r=await post('/api/agents',{action:'delete',key:a.key});
+  if(r.error){ alert(r.error); return; }
+  closeAgentModal();
+  await refreshAgents(); await loadSetup(); renderAgents(); syncPlaceholder();
+};
+AM('amSave').onclick = async()=>{
+  const name = AM('afName').value.trim();
+  if(!name){ alert('名字是必填的 —— 聊天里要用它点名。'); return; }
+  const body = {
+    action: amEditKey ? 'update' : 'add',
+    name,
+    emoji: AM('afEmoji').value.trim(),
+    color: AM('afColor').value,
+    personas: AM('afPersonas').value,
+  };
+  if(amEditKey) body.key = amEditKey;
+  const k = AM('afKey').value.trim();
+  if(k && !amEditKey) body.key = k;
+  const px = AM('afPrefix').value.trim();
+  if(px) body.prefix = px;
+  const ws = AM('afWorkspace').value.trim();
+  if(ws) body.workspace = ws;
+  /* 接口：只传填了的字段（后端按字段合并；"-" = 清除该字段） */
+  const bu = AM('afBaseUrl').value.trim();
+  const ak = AM('afApiKey').value.trim();
+  const md = AM('afModel').value.trim();
+  const pv = {};
+  if(bu) pv.base_url = bu;
+  if(md) pv.model = md;
+  if(ak) pv.api_key = ak;
+  if(Object.keys(pv).length) body.provider = pv;
+  /* 工作引擎：命令有内容 → command；原来就是 command 现在清空 → 切回接口 */
+  const engType = (document.querySelector('#afEngine button.active') || {dataset:{}}).dataset.v || 'api';
+  const engCmd = AM('afCmd').value.trim();
+  const engCwd = AM('afCwd').value.trim();
+  const engTo  = AM('afTimeout').value.trim();
+  const engEnv = {};
+  AM('afEnv').value.split('\n').forEach(l=>{
+    const s = l.trim(); const i2 = s.indexOf('=');
+    if(!s || i2 < 1) return;
+    engEnv[s.slice(0,i2).trim()] = s.slice(i2+1).trim();
+  });
+  const e0 = (amEditKey ? ((AGENTS.find(x=>x.key===amEditKey)||{}).engine||{}) : {});
+  if(engType === 'command' && engCmd){
+    const same = e0.type === 'command' && engCmd === (e0.cmd||'') &&
+                 engCwd === (e0.cwd||'') && engTo === String(e0.timeout||'') &&
+                 JSON.stringify(engEnv) === JSON.stringify(e0.env||{});
+    if(!same) body.engine = {type:'command', cmd:engCmd, cwd:engCwd, timeout:engTo, env:engEnv};
+  } else if(e0.type === 'command'){
+    body.engine = {type:'api'};
+  }
+  if(amEditKey){                       /* 只传变化过的字段，避免误清 */
+    const a = AGENTS.find(x=>x.key===amEditKey) || {};
+    const p = a.provider || {};
+    Object.keys(body).forEach(f=>{
+      if(f==='name' && body[f]===a.name) delete body[f];
+      if(f==='emoji' && body[f]===(a.emoji||'')) delete body[f];
+      if(f==='color' && body[f]===(a.color||'')) delete body[f];
+    });
+    if((body.personas||'') === (a.persona_files||[]).join('\n')) delete body.personas;
+    if(body.provider){
+      const same = (pv.base_url||'')===(p.base_url||'') && (pv.model||'')===(p.model||'');
+      if(same && !pv.api_key) delete body.provider;
+    }
+    if(body.workspace === (a.workspace||'')) delete body.workspace;
+    if(body.prefix === (a.prefix||'')) delete body.prefix;
+    if(Object.keys(body).length<=1){ closeAgentModal(); return; }
+  }
+  const r = await post('/api/agents', body);
+  if(r.error){ alert(r.error); return; }
+  /* 群聊身份（设置项而非成员字段） */
+  const role = AM('afRole').value;
+  if(amEditKey){
+    const g=Object.assign({},(S&&S.groupRoles)||{});
+    if((g[amEditKey]||'peer')!==role){ g[amEditKey]=role; patch({groupRoles:g}); }
+  }
+  closeAgentModal();
+  await refreshAgents(); await loadSetup();
+  renderAgents(); syncPlaceholder();
+};
+document.getElementById('agAddBtn').onclick = ()=>openAgentModal('');
+
+/* 分身配方：把身份文件导进来 → 一键建成员（文件存进 personas/，自包含） */
+const agImpBtn = document.getElementById('agImportBtn');
+const agImpFile = document.getElementById('agImportFile');
+agImpBtn.onclick = ()=>agImpFile.click();
+agImpFile.onchange = async ()=>{
+  const fs = Array.from(agImpFile.files || []);
+  agImpFile.value = '';
+  if(!fs.length) return;
+  const files = [];
+  for(const f of fs){
+    if(f.size > 512*1024){ alert('『'+f.name+'』太大了 —— 身份文件一般几十 KB 以内。'); return; }
+    files.push({name: f.name, content: await f.text()});
+  }
+  const nm = prompt('给这个分身起个名字（留空 = 自动从身份文件里认）：', '');
+  if(nm === null) return;
+  agImpBtn.textContent = '导入中…';
+  const r = await post('/api/agents/import-personas', {files, name: nm.trim()});
+  agImpBtn.textContent = '⇪ 导入身份文件';
+  if(r.error){ alert(r.error); return; }
+  await refreshAgents(); await loadSetup(); renderAgents(); syncPlaceholder();
+  alert('建好了：『'+r.name+'』\n身份文件已存进：'+r.dir+
+        '\n\n下一步：点它那行的「编辑」，填上接口地址 / API Key / 模型名。');
+};
+
+/* ============ 工作台插件（plugins/ 目录） ============ */
+let WBPLUG = {plugins: [], dir: '', guide: ''};
+const pmask = document.getElementById('pmask');
+const pmBody = document.getElementById('pmBody');
+const pmTitle = document.getElementById('pmTitle');
+document.getElementById('pmClose').onclick = () => pmask.classList.remove('on');
+pmask.onclick = e => { if (e.target === pmask) pmask.classList.remove('on'); };
+document.getElementById('pmReloadFrame').onclick = () => {
+  const f = pmBody.querySelector('iframe');
+  if (f) f.src = f.src;
+};
+
+function openPluginFrame(title, node){
+  pmTitle.textContent = title;
+  pmBody.innerHTML = '';
+  if (node) pmBody.appendChild(node);
+  pmask.classList.add('on');
+}
+async function loadWbPlugins(){
+  const box = document.getElementById('wbPlugins'); if (!box) return;
+  try { WBPLUG = await fetch('/api/plugins').then(r => r.json()); }
+  catch(e){ box.innerHTML = '<p class="note">插件接口读取失败：' + e.message + '</p>'; return; }
+  const d = document.getElementById('plugDir');
+  if (d && WBPLUG.dir) d.textContent = WBPLUG.dir;
+  renderWbPlugins();
+}
+function renderWbPlugins(){
+  const box = document.getElementById('wbPlugins'); if (!box) return;
+  const list = WBPLUG.plugins || [];
+  if (!list.length){
+    box.innerHTML = '<p class="note">还没有插件。点「＋ 新建插件」生成骨架，'
+      + '或把别人的插件文件夹放进 <code class="k">' + (WBPLUG.dir || 'plugins/')
+      + '</code> 再点「重新扫描」。</p>';
+    return;
+  }
+  box.innerHTML = '';
+  list.forEach(p => {
+    const c = document.createElement('div'); c.className = 'plugcard';
+    const t = document.createElement('div'); t.className = 'pt';
+    t.appendChild(document.createTextNode((p.enabled ? '🟢 ' : '⚪ ') + (p.title || p.name)));
+    const tag = document.createElement('span'); tag.className = 'tag';
+    tag.textContent = 'v' + (p.version || '?') + (p.author ? ' · ' + p.author : '');
+    t.appendChild(tag);
+    (p.hooks || []).forEach(h => {
+      const s = document.createElement('span'); s.className = 'tag'; s.textContent = h;
+      t.appendChild(s);
+    });
+    if (p.ui){
+      const bits = [];
+      if (p.ui.css) bits.push('CSS×' + p.ui.css);
+      if (p.ui.js) bits.push('JS×' + p.ui.js);
+      if (p.ui.vars) bits.push('变量×' + p.ui.vars);
+      if (p.ui.snippets) bits.push('插槽×' + p.ui.snippets);
+      if (p.ui.background) bits.push('背景板');
+      if (bits.length){
+        const s = document.createElement('span'); s.className = 'tag';
+        s.textContent = '界面：' + bits.join(' ');
+        s.title = '这个插件会改动工作台界面';
+        t.appendChild(s);
+      }
+    }
+    if (p.error){
+      const e = document.createElement('span'); e.className = 'tag err';
+      e.textContent = '载入出错'; e.title = p.error; t.appendChild(e);
+    }
+    c.appendChild(t);
+    const d = document.createElement('div'); d.className = 'pd';
+    d.textContent = (p.description || '（这个插件没写说明）') + (p.error ? '　⚠ ' + p.error : '');
+    c.appendChild(d);
+    const ops = document.createElement('div'); ops.className = 'pops';
+    const mk = (txt, fn, danger) => {
+      const b = document.createElement('button');
+      b.className = 'btn' + (danger ? ' danger' : ''); b.textContent = txt;
+      b.onclick = fn; ops.appendChild(b);
+    };
+    if (p.panel) mk('打开面板', () => {
+      const f = document.createElement('iframe');
+      f.src = '/ext/' + encodeURIComponent(p.name) + '/' + p.panel;
+      openPluginFrame((p.title || p.name) + ' · 面板', f);
+    });
+    mk(p.enabled ? '停用' : '启用', async () => {
+      await post('/api/plugins/toggle', {name: p.name, enabled: !p.enabled});
+      loadWbPlugins();
+    });
+    c.appendChild(ops);
+    box.appendChild(c);
+  });
+}
+document.getElementById('plugReload').onclick = async () => {
+  await post('/api/plugins/reload', {});
+  await loadWbPlugins();
+};
+document.getElementById('plugNew').onclick = async () => {
+  const name = prompt('插件名（英文/数字/-/_，例如 my-plugin）：');
+  if (!name) return;
+  const title = prompt('显示名（可留空，默认跟插件名一样）：') || name;
+  const r = await post('/api/plugins/create', {name, title});
+  if (r.error){ alert(r.error); return; }
+  await loadWbPlugins();
+  alert('已生成插件骨架：\n' + r.dir + '\n\n改完代码点「重新扫描」即时生效。');
+};
+document.getElementById('plugGuide').onclick = () => {
+  const pre = document.createElement('pre');
+  pre.textContent = WBPLUG.guide || '（指南加载失败，直接看 plugins/ 里的示例插件）';
+  openPluginFrame('工作台插件开发指南', pre);
+};
+
+async function openDrawer(){
+  drawer.classList.add('on'); mask.classList.add('on');
+  await loadSetup();
+  loadPresets();
+  loadDefaultProvider();
+  loadPlugins(); loadWbPlugins(); renderAgents();
+}
+function closeDrawer(){ drawer.classList.remove('on'); mask.classList.remove('on'); }
+document.getElementById('railSet').onclick = openDrawer;
+document.getElementById('closeSet').onclick= closeDrawer;
+/* 版本自检：显示这个页面的文件时间。若这里显示的时间早于本次改动，
+   说明浏览器拿的是旧页面，按 Ctrl+F5 强刷一遍即可。 */
+try{
+  var _bt = document.getElementById('buildTag');
+  if(_bt) _bt.textContent = '界面文件 ' + (document.lastModified || '未知');
+}catch(e){}
+
+mask.onclick = closeDrawer;
+
+/* ============ 外部引擎插件 ============ */
+async function loadPlugins(){
+  const box=document.getElementById('plugins');
+  box.innerHTML='<p class="note">加载中…</p>';
+  let r;
+  try{ r = await fetch('/api/engine/plugins').then(x=>x.json()); }
+  catch(e){ box.innerHTML='<p class="note">读取失败：'+e+'</p>'; return; }
+  if(r.error){ box.innerHTML='<p class="note">'+r.error+'</p>'; return; }
+  document.getElementById('plugNote').textContent =
+    '配置：'+r.profile+'　插件目录：'+r.dir+'　（改动实时生效，写前自动备份 .bak_twinai）';
+  box.innerHTML='';
+  const list=r.plugins||[];
+  if(!list.length){ box.innerHTML='<p class="note">暂无插件。</p>'; return; }
+  list.forEach(p=>{
+    const d=document.createElement('div'); d.className='plug';
+    const tag = !p.installed ? '<span class="tag">未安装</span>'
+              : p.enabled ? '<span class="tag on">已启用</span>'
+              : '<span class="tag off">已停用</span>';
+    d.innerHTML =
+      `<div class="ptop"><b>${p.name}</b><span class="ver">${p.version||''}</span>${tag}</div>
+       <div class="pdesc">${(p.description||'（无描述）').slice(0,90)}</div>`;
+    const ops=document.createElement('div'); ops.className='pops';
+    const mk=(txt,fn,warn)=>{ const b=document.createElement('button'); b.textContent=txt;
+      if(warn)b.className='warn'; b.onclick=fn; ops.appendChild(b); };
+    if(!p.installed){
+      mk('安装', async()=>{ await post('/api/engine/plugins/install',{path:p.path}); loadPlugins(); });
+    }else{
+      if(p.enabled) mk('停用', async()=>{ await post('/api/engine/plugins/toggle',{name:p.name,enabled:false}); loadPlugins(); });
+      else          mk('启用', async()=>{ await post('/api/engine/plugins/toggle',{name:p.name,enabled:true});  loadPlugins(); });
+      mk('卸载', async()=>{ if(confirm('确定卸载「'+p.name+'」？')){ await post('/api/engine/plugins/uninstall',{name:p.name}); loadPlugins(); } }, true);
+    }
+    d.appendChild(ops);
+    if(p.path) d.insertAdjacentHTML('beforeend','<div class="path">'+p.path+'</div>');
+    box.appendChild(d);
+  });
+}
+async function post(url,body){
+  const r = await fetch(url,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const t = await r.text();
+  try{ return t ? JSON.parse(t) : {}; }catch(e){ return {}; }
+}
+
+/* ============================================================
+   插件系统：界面注入 + window.WB（插件 ui.js 里能用的全部能力）
+   —— 插件可以改工作台的一切：背景板、配色、圆角、布局、按钮、行为
+   ============================================================ */
+let WBUI = null;
+let WB_VARS = [];        // 插件设过的 CSS 变量（重载时要清掉）
+let WB_CLASS = [];       // 插件加过的 body 类名（重载时要清掉）
+
+function wbSlotHost(name){
+  let el = document.querySelector('.wb-slot[data-slot="' + name + '"]');
+  if (el) return el;
+  el = document.createElement('div');
+  el.className = 'wb-slot'; el.dataset.slot = name;
+  el.dataset.wbPlugin = 'slot';
+  const hostMap = {
+    head: document.head,
+    body: document.body,
+    top: document.body,
+    bottom: document.body,
+    rail: document.getElementById('rail'),
+    clist: document.getElementById('clistItems') || document.getElementById('clist'),
+    chat: document.getElementById('main'),
+    chatbar: document.getElementById('inputbar'),
+    settings: document.querySelector('#drawer .dbody') || document.getElementById('drawer'),
+    left: document.getElementById('clist'),
+    right: document.getElementById('rail')
+  };
+  const host = hostMap[name] || document.body;
+  if (name === 'top') document.body.insertBefore(el, document.body.firstChild);
+  else if (name === 'rail') host.insertBefore(el, document.getElementById('railSet'));
+  else host.appendChild(el);
+  return el;
+}
+
+function wbClearInjected(){
+  document.querySelectorAll('[data-wb-plugin]').forEach(el => { try { el.remove(); } catch(e){} });
+  const de = document.documentElement, b = document.body;
+  WB_VARS.forEach(v => { try { de.style.removeProperty(v); } catch(e){} });
+  WB_VARS = [];
+  WB_CLASS.forEach(c => { try { b.classList.remove(c); } catch(e){} });
+  WB_CLASS = [];
+  b.classList.remove('hasPluginBg');
+  const bgEl = document.getElementById('pluginBg');
+  if (bgEl){ bgEl.className = ''; bgEl.removeAttribute('style'); }
+}
+
+async function loadPluginUI(){
+  let ui;
+  try { ui = await fetch('/api/plugins/ui').then(r => r.json()); }
+  catch(e){ return null; }
+  WBUI = ui;
+  wbClearInjected();
+  const de = document.documentElement, b = document.body;
+  /* 1. 主题变量（插件覆盖 --bg/--panel/--accent/--r-msg… 全局生效） */
+  Object.keys(ui.vars || {}).forEach(k => {
+    de.style.setProperty(k, ui.vars[k]); WB_VARS.push(k);
+  });
+  /* 2. body 类名（插件用 CSS 挂钩子，比如 body.my-skin .xxx{}） */
+  (ui.bodyClass || []).forEach(c => { if (c) { b.classList.add(c); WB_CLASS.push(c); } });
+  /* 3. 背景板图像 */
+  const bgEl = document.getElementById('pluginBg');
+  if (ui.background && bgEl){
+    const g = ui.background;
+    bgEl.style.backgroundImage = 'url("' + g.url + '")';
+    bgEl.style.backgroundSize = g.size || 'cover';
+    bgEl.style.backgroundPosition = g.position || 'center';
+    bgEl.style.backgroundRepeat = g.repeat || 'no-repeat';
+    bgEl.style.backgroundAttachment = g.attachment || 'fixed';
+    if (g.color) bgEl.style.backgroundColor = g.color;
+    if (g.opacity != null) bgEl.style.opacity = g.opacity;
+    if (g.blur) bgEl.style.filter = 'blur(' + g.blur + 'px)';
+    bgEl.classList.add('on');
+    b.classList.add('hasPluginBg');
+  }
+  /* 4. 样式：外部 CSS 文件 + 内联 CSS 文本 */
+  (ui.css || []).forEach(href => {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = href; l.dataset.wbPlugin = 'css';
+    document.head.appendChild(l);
+  });
+  (ui.cssText || []).forEach(txt => {
+    const s = document.createElement('style');
+    s.textContent = txt; s.dataset.wbPlugin = 'css';
+    document.head.appendChild(s);
+  });
+  /* 5. 插槽：把插件写的 HTML 片段塞进指定位置 */
+  const snips = ui.snippets || {};
+  for (const slot of Object.keys(snips)){
+    const urls = snips[slot] || [];
+    for (const u of urls){
+      let html = '';
+      try { html = await fetch(u).then(r => r.text()); } catch(e){ continue; }
+      const box = document.createElement('div');
+      box.className = 'wb-snip'; box.dataset.wbPlugin = 'snip';
+      box.innerHTML = html;
+      /* innerHTML 里的 <script> 不会执行 → 换成新的 script 节点让它跑起来 */
+      box.querySelectorAll('script').forEach(old => {
+        const s = document.createElement('script');
+        [...old.attributes].forEach(a => s.setAttribute(a.name, a.value));
+        s.textContent = old.textContent;
+        s.dataset.wbPlugin = 'snip';
+        old.replaceWith(s);
+      });
+      if (slot === 'head') document.head.appendChild(box);
+      else wbSlotHost(slot).appendChild(box);
+    }
+  }
+  /* 6. 脚本：外部 JS 文件 + 内联 JS 文本（加时间戳，重载时强制重跑） */
+  (ui.js || []).forEach(src => {
+    const s = document.createElement('script');
+    s.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now();
+    s.dataset.wbPlugin = 'js';
+    document.body.appendChild(s);
+  });
+  (ui.jsText || []).forEach(txt => {
+    const s = document.createElement('script');
+    s.textContent = txt; s.dataset.wbPlugin = 'js';
+    document.body.appendChild(s);
+  });
+  /* 7. 标题 / 图标 */
+  const titles = ui.titles || [];
+  if (titles.length) document.title = titles[titles.length - 1];
+  WB.emit('ui', ui);
+  return ui;
+}
+
+/* ---------------- window.WB：给插件脚本用的正式接口 ---------------- */
+window.WB = (function(){
+  const bus = {};
+  const api = {
+    version: '1.0',
+    plugins: [],
+    /* --- 事件总线 --- */
+    on(ev, fn){ (bus[ev] = bus[ev] || []).push(fn); return api; },
+    off(ev, fn){ if (bus[ev]) bus[ev] = bus[ev].filter(f => f !== fn); return api; },
+    emit(ev, data){
+      (bus[ev] || []).forEach(f => { try { f(data); } catch(e){ console.warn('[WB]', e); } });
+      return api;
+    },
+    /* --- 读改工作台状态 --- */
+    settings(){ return S; },
+    patchSettings(o){ patch(o); return S; },
+    agents(){ return AGENTS; },
+    conversations(){ return (S && S.groups) || []; },
+    /* --- 界面 --- */
+    toast(msg){
+      let box = document.getElementById('wbToast');
+      if (!box){
+        box = document.createElement('div'); box.id = 'wbToast';
+        document.body.appendChild(box);
+      }
+      const d = document.createElement('div');
+      d.className = 'wb-toast'; d.textContent = String(msg);
+      box.appendChild(d);
+      requestAnimationFrame(() => d.classList.add('on'));
+      setTimeout(() => { d.classList.remove('on');
+        setTimeout(() => d.remove(), 300); }, 3200);
+      return d;
+    },
+    slot(name){ return wbSlotHost(name); },
+    addRailButton(o){
+      o = o || {};
+      const el = document.createElement('div');
+      el.className = 'railicon'; el.title = o.title || '';
+      el.textContent = o.icon || '🔌';
+      el.dataset.wbPlugin = 'rail';
+      if (o.onclick) el.onclick = o.onclick;
+      document.getElementById('rail').insertBefore(el, document.getElementById('railSet'));
+      return el;
+    },
+    addSettingSection(title, build){
+      const body = document.querySelector('#drawer .dbody') || document.getElementById('drawer');
+      const sec = document.createElement('section');
+      sec.dataset.wbPlugin = 'set';
+      const h = document.createElement('h3'); h.textContent = title || '插件设置';
+      sec.appendChild(h);
+      const box = document.createElement('div');
+      sec.appendChild(box);
+      try { build(box, sec); } catch(e){ console.warn('[WB] addSettingSection', e); }
+      body.appendChild(sec);
+      return sec;
+    },
+    openPanel(title, node){ openPluginFrame(title, node); },
+    /* --- 与后端交互 --- */
+    get(url){ return fetch(url).then(r => r.json()); },
+    post(url, body){ return post(url, body); },
+    send(text){
+      if (!conv) { api.toast('先选一个会话'); return; }
+      msgEl.value = String(text || ''); doSend();
+    },
+    reloadUI(){ return loadPluginUI(); }
+  };
+  return api;
+})();
+
+/* ---------------- 插件 → 前端 的实时事件通道 ---------------- */
+let WB_ES = null;
+function connectPluginStream(){
+  if (WB_ES) { try { WB_ES.close(); } catch(e){} }
+  try {
+    WB_ES = new EventSource('/api/plugins/stream');
+    WB_ES.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch(err){ return; }
+      if (m && m.type === 'plugin-event'){
+        WB.emit('plugin:' + m.event, {plugin: m.plugin, data: m.data});
+      }
+    };
+    WB_ES.onerror = () => {};   /* EventSource 自己会重连 */
+  } catch(e){}
+}
+
+/* ============ 启动：读设置 → 成员 → 模型 → 恢复上次会话（或第一个单聊） ============ */
+(async()=>{
+  await loadPresets();
+  const ok = await loadSettings();
+  if(!ok) return;
+  await loadAgents();
+  await loadModels();
+  loadSessionList();
+  /* 插件：注入界面（CSS/JS/插槽/变量/背景板）+ 接上实时事件通道 */
+  await loadPluginUI();
+  connectPluginStream();
+  /* 恢复上次打开的会话；无效则打开第一个单聊 */
+  const lc=(S&&S.lastConv)||null;
+  if(lc && lc.type==='single' && AGENTS.some(a=>a.key===lc.key)){
+    openConv(lc);
+  }else if(lc && lc.type==='group' && (S.groups||[]).some(g=>g.name===lc.name)){
+    openConv(lc);
+  }else if(AGENTS.length){
+    openConv({type:'single', key:AGENTS[0].key});
+  }else{
+    syncPlaceholder();
+    showConvShell(false);
+  }
+})();
+</script>
+<script>
+/* 外部能力（MCP / DSH 插件）—— 设置面板里的管理逻辑 */
+(function () {
+  function el(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function renderMCP(d) {
+    var box = el('mcpList');
+    if (box) {
+      var sv = (d && d.servers) || [];
+      box.innerHTML = sv.length ? '' :
+        '<p class="note">还没接任何 MCP 服务。可以先点下面的「⚡ 接入示例服务」验证链路。</p>';
+      box.innerHTML += sv.map(function (s) {
+        var on = s.alive && !s.disabled;
+        var state = s.disabled ? '已停用' : (on ? '已连接' : '未连接');
+        return '<div class="mcpCard">' +
+          '<div class="h"><span class="n">' + esc(s.name) + '</span>' +
+          '<span class="mcpTag ' + (on ? 'mcpOn' : 'mcpOff') + '">' + state + '</span>' +
+          '<span class="mcpTag" style="color:var(--accent)">工具 ' + ((s.tools || []).length) + '</span></div>' +
+          '<div class="mcpCmd">' + esc(((s.cfg || {}).command || '') + ' ' +
+            (((s.cfg || {}).args || []).join(' '))) +
+            ((s.cfg || {}).cwd ? ('　cwd: ' + esc(s.cfg.cwd)) : '') + '</div>' +
+          ((s.tools && s.tools.length) ? ('<div class="mcpTools">' +
+            s.tools.map(function (t) { return esc(t.name); }).join(' · ') + '</div>') : '') +
+          (s.error ? ('<div class="mcpErr">⚠ ' + esc(s.error) + '</div>') : '') +
+          '<div class="mcpRow">' +
+            '<button class="btn" data-act="test" data-n="' + esc(s.name) + '">测试连接</button>' +
+            '<button class="btn" data-act="toggle" data-n="' + esc(s.name) + '">' + (s.disabled ? '启用' : '停用') + '</button>' +
+            '<button class="btn" data-act="del" data-n="' + esc(s.name) + '">删除</button>' +
+          '</div></div>';
+      }).join('');
+    }
+
+    var dl = el('dshList'), dn = el('dshNote');
+    var dp = (d && d.dsh) || [];
+    if (dn) {
+      dn.innerHTML = dp.length
+        ? ('扫到 ' + dp.length + ' 个。<b>MCP 形态的可以直接接入</b>；界面挂件是缝在 DSH 身上的，搬不进工作台 —— 想要同款功能请用「工作台插件」重写（反而更简单）。')
+        : '本机没有扫到 DSH 插件。';
+    }
+    if (dl) {
+      dl.innerHTML = dp.map(function (p) {
+        var can = p.kind === 'mcp';
+        var label = can ? '可接入' : (p.kind === 'widget' ? '界面挂件' : '普通包');
+        return '<div class="mcpCard">' +
+          '<div class="h"><span class="n">' + esc(p.name) + '</span>' +
+          '<span class="mcpTag ' + (can ? 'mcpOn' : 'mcpOff') + '">' + label + '</span>' +
+          (p.version ? ('<span class="mcpTag" style="opacity:.6">v' + esc(p.version) + '</span>') : '') + '</div>' +
+          (p.description ? ('<div class="mcpTools">' + esc(p.description) + '</div>') : '') +
+          '<div class="mcpTools">' + esc(p.reason || '') + '</div>' +
+          '<div class="mcpCmd">' + esc(p.dir || '') + '</div>' +
+          (can ? ('<div class="mcpRow"><button class="btn" data-adopt="' + esc(p.name) + '">⇪ 接入工作台</button></div>') : '') +
+          '</div>';
+      }).join('');
+    }
+  }
+
+  window.loadMCP = async function () {
+    if (!el('mcpList')) return;
+    try {
+      var r = await fetch('/api/mcp');
+      renderMCP(await r.json());
+    } catch (e) {
+      var b = el('mcpList');
+      if (b) b.innerHTML = '<p class="note">加载失败：' + esc(e) + '</p>';
+    }
+  };
+
+  async function act(body) {
+    try {
+      var r = await fetch('/api/mcp', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      var d = await r.json();
+      var m = el('mcpMsg');
+      if (m) m.textContent = d.msg || (d.ok ? '完成' : '失败');
+      await window.loadMCP();
+    } catch (e) {
+      var m2 = el('mcpMsg');
+      if (m2) m2.textContent = '出错：' + e;
+    }
+  }
+
+  function splitArgs(s) {
+    return String(s || '').trim().split(/\s+/).filter(Boolean);
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+
+    var tab = t.closest('#setTabs button');
+    if (tab && tab.getAttribute('data-t') === 'mcp') { setTimeout(window.loadMCP, 30); return; }
+    if (t.id === 'railSet') { setTimeout(window.loadMCP, 120); return; }
+
+    var b = t.closest('[data-act]');
+    if (b) {
+      var n = b.getAttribute('data-n'), a = b.getAttribute('data-act');
+      if (a === 'del') {
+        if (!confirm('删除 MCP 服务「' + n + '」？')) return;
+        act({ action: 'delete', name: n });
+      } else if (a === 'toggle') {
+        act({ action: 'toggle', name: n, disabled: b.textContent.indexOf('停用') >= 0 });
+      } else {
+        act({ action: a, name: n });
+      }
+      return;
+    }
+
+    var ad = t.closest('[data-adopt]');
+    if (ad) {
+      fetch('/api/mcp/adopt-dsh', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: ad.getAttribute('data-adopt') })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        var m = el('mcpMsg');
+        if (m) m.textContent = d.msg || (d.ok ? '已接入' : '接入失败');
+        return window.loadMCP();
+      });
+      return;
+    }
+
+    if (t.id === 'mcpAdd') {
+      var name = (el('mcpName').value || '').trim();
+      var cmd = (el('mcpCmd').value || '').trim();
+      if (!name || !cmd) {
+        var mm = el('mcpMsg');
+        if (mm) mm.textContent = '服务名和启动命令都要填';
+        return;
+      }
+      act({
+        action: 'add', name: name,
+        cfg: {
+          command: cmd,
+          args: splitArgs(el('mcpArgs').value),
+          cwd: (el('mcpCwd').value || '').trim(),
+          env: {}
+        }
+      });
+      return;
+    }
+    if (t.id === 'mcpRefresh') { act({ action: 'refresh', name: '_' }); return; }
+    if (t.id === 'mcpDemo') { act({ action: 'add-demo', name: 'demo' }); return; }
+  }, true);
+})();
+</script>
+</body>
+</html>

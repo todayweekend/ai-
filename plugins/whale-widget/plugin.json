@@ -1,0 +1,12 @@
+{
+  "name": "whale-widget",
+  "title": "小鲸鱼余额挂件",
+  "version": "1.0.0",
+  "author": "移植自 dsh-whale-widget（MIT）",
+  "description": "界面右下角浮一只小鲸鱼，显示 DeepSeek 余额与今日已用。余额用 config.json 的 DeepSeek key 在服务端拉取，不暴露给前端。",
+  "main": "main.py",
+  "ui": {
+    "css": ["ui.css"],
+    "js": ["ui.js"]
+  }
+}

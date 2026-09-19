@@ -1,0 +1,48 @@
+{
+  "//这是什么": "多 AI 工作台的空配置模板。第一次启动时如果找不到 config.json，工作台会照这份生成一份自己的 —— 里面没有任何人的密钥，需要你自己填。",
+  "deepseek": {
+    "//说明": "默认接口。「设置 → AI 成员与模型 → 默认接口」里也能改。任何 OpenAI 兼容平台都行：DeepSeek / GPT / Kimi / GLM / 通义 / 本地 Ollama…",
+    "api_key": "",
+    "model": "deepseek-flash",
+    "base_url": "https://api.deepseek.com/v1"
+  },
+  "agents": [],
+  "//成员说明": "成员留空，打开工作台后到「设置 → AI 成员与模型 → ＋ 添加成员」自己加。单个成员长这样：",
+  "//成员示例": {
+    "key": "assistant",
+    "name": "助手",
+    "emoji": "🤖",
+    "color": "#2563eb",
+    "prefix": "AS_",
+    "workspace": "./ws_assistant",
+    "persona_files": [],
+    "model": "deepseek-flash",
+    "provider": {
+      "//说明": "可选。填了就单独走这个平台，不填就用上面的默认接口。",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "sk-…",
+      "model": "gpt-4o"
+    },
+    "engine": {
+      "//说明": "可选。不填 = 内置的接口引擎（读人设 + 带 key 调接口 + 6 个工具）。填了 = 把话交给一条本地命令，取它的 stdout 当回复。命令里写 {prompt} 就走命令行参数，不写就从 stdin 喂。",
+      "type": "command",
+      "cmd": ["claude", "-p", "{prompt}"],
+      "cwd": "./ws_engine",
+      "timeout": 300
+    }
+  },
+  "port": 7860,
+  "max_tool_rounds": 8,
+  "//可选_把工作台里发生的事同步到外部目录": "sync_to_external / sync_dir",
+  "//可选_外部引擎真身（调本机 dsh harness）才需要": {
+    "harness": {
+      "node": "node",
+      "bin": "~/.dsh/profiles/node_modules/@deepseek-ai/dsh/lib/bin.js",
+      "home": "~/.dsh",
+      "cwd": "./ws_engine"
+    },
+    "dsh_home": "~/.dsh",
+    "dsh_web_profile": "~/.dsh/profiles/web/package.json",
+    "engine_plugins_dir": "./engine_plugins"
+  }
+}

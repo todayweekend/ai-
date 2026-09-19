@@ -1,0 +1,26 @@
+{
+  "name": "example-skin",
+  "title": "星轨夜空皮肤",
+  "version": "1.0.0",
+  "author": "多 AI 工作台",
+  "description": "示例插件：换背景板 + 改配色圆角 + 往功能栏加按钮 + 改回复文案 + 自定义 /skin 指令。默认停用，启用即可看到效果。",
+  "enabled": false,
+  "main": "main.py",
+  "panel": "panel.html",
+  "ui": {
+    "css": ["ui.css"],
+    "js": ["ui.js"],
+    "snippets": {
+      "settings": ["snippets/settings.html"]
+    },
+    "bodyClass": ["example-skin"],
+    "background": {
+      "image": "bg.svg",
+      "size": "cover",
+      "position": "center",
+      "repeat": "no-repeat",
+      "attachment": "fixed",
+      "opacity": 1
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# 多 AI 工作台 · 运行依赖
+# 安装:  python -m pip install -r requirements.txt
+# (开发机实测版本: fastapi 0.141.1 / uvicorn 0.52.4)
+# 需要 Python 3.9 及以上（工作台用到 3.9+ 语法；whale-widget 等插件为纯标准库，3.8 也能跑）
+fastapi>=0.110
+uvicorn>=0.27
+# app.py 直接用到了 anyio.to_thread.run_sync（fastapi 会带进来，但显式声明更稳）
+anyio>=4.0

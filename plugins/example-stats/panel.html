@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>发言统计 · 示例插件面板</title>
+<style>
+  body{margin:0;padding:18px 20px;font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+       background:#f6f7f9;color:#1b1e23}
+  h2{margin:0 0 4px;font-size:16px}
+  .sub{color:#6b7280;font-size:12.5px;margin-bottom:14px}
+  .row{background:#fff;border:1px solid #dfe3e8;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .who{font-weight:600;font-size:13px}
+  .num{margin-left:auto;color:#2563eb;font-size:12.5px;font-weight:600}
+  .bar{height:7px;border-radius:5px;background:#eef0f3;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#2563eb,#60a5fa)}
+  .last{color:#6b7280;font-size:12px;margin-top:6px;line-height:1.5}
+  .empty{color:#6b7280;font-size:13px;padding:22px;text-align:center;background:#fff;
+         border:1px dashed #dfe3e8;border-radius:10px}
+  button{border:1px solid #dfe3e8;background:#fff;border-radius:6px;padding:5px 11px;
+         cursor:pointer;font-size:12.5px;font-family:inherit}
+  button:hover{border-color:#2563eb;color:#2563eb}
+</style>
+</head>
+<body>
+  <h2>发言统计</h2>
+  <div class="sub">示例插件面板：这个页面放在插件目录里（panel.html），通过 /ext/example-stats/panel.html 访问，
+    调用插件自己的接口 /api/example-stats 取数据。</div>
+  <div id="box"><div class="empty">读取中…</div></div>
+  <div style="margin-top:10px"><button onclick="load()">⟳ 刷新</button></div>
+
+<script>
+async function load(){
+  const box = document.getElementById('box');
+  let d;
+  try { d = (await fetch('/api/example-stats').then(r => r.json())).data || {}; }
+  catch(e){ box.innerHTML = '<div class="empty">接口读取失败：' + e.message + '</div>'; return; }
+  const keys = Object.keys(d);
+  if(!keys.length){ box.innerHTML = '<div class="empty">还没有数据——去工作台跟 AI 聊两句再回来刷新。</div>'; return; }
+  const max = Math.max(...keys.map(k => d[k].次数 || 0), 1);
+  box.innerHTML = '';
+  keys.sort((a,b) => (d[b].次数||0) - (d[a].次数||0)).forEach(k => {
+    const v = d[k];
+    const w = Math.max(4, Math.round((v.次数 || 0) / max * 100));
+    const el = document.createElement('div');
+    el.className = 'row';
+    el.innerHTML = '<div class="top"><span class="who">' + k + '</span>'
+      + '<span class="num">' + (v.次数||0) + ' 次 · ' + (v.字数||0) + ' 字</span></div>'
+      + '<div class="bar"><i style="width:' + w + '%"></i></div>'
+      + '<div class="last">最近：' + (v.最近 || '—') + '</div>';
+    box.appendChild(el);
+  });
+}
+load();
+</script>
+</body>
+</html>

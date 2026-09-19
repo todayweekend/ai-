@@ -1,0 +1,28 @@
+<!-- 插件 example-skin 注入到「设置」面板里的片段（plugin.json → ui.snippets.settings）
+     片段里可以放任何 HTML，里面的 <script> 也会被执行 -->
+<div class="row" style="align-items:center;gap:8px">
+  <label style="flex:1">星轨皮肤：给回复加「✦ 星轨」签名</label>
+  <input type="checkbox" id="exSkinSign">
+</div>
+<p class="note" id="exSkinNote">（插件 example-skin 注入的设置项）</p>
+<script>
+(function () {
+  var box = document.getElementById('exSkinSign');
+  var note = document.getElementById('exSkinNote');
+  if (!box) return;
+  fetch('/api/example-skin/stats').then(function (r) { return r.json(); })
+    .then(function (d) {
+      box.checked = !!d.sign;
+      if (note) note.textContent = '（插件 example-skin 注入 · 已统计回复 ' + (d.replies || 0) + ' 条）';
+    }).catch(function () {});
+  box.onchange = function () {
+    fetch('/api/example-skin/sign', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sign: box.checked})
+    }).then(function () {
+      if (window.WB) WB.toast('星轨签名已' + (box.checked ? '开启' : '关闭'));
+    });
+  };
+})();
+</script>

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>星轨夜空皮肤</title>
+<style>
+  body{font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;margin:0;
+       color:#e8ecf5;background:#0b1020;
+       background-image:url('bg.svg');background-size:cover;background-position:center;
+       background-attachment:fixed;min-height:100vh}
+  .wrap{padding:22px;max-width:640px;margin:0 auto}
+  h2{margin:0 0 6px;font-size:18px}
+  code{background:rgba(255,255,255,.12);padding:1px 6px;border-radius:4px}
+  p,li{line-height:1.85;font-size:13.5px}
+  .card{background:rgba(12,17,30,.72);border:1px solid rgba(240,180,41,.3);
+        border-radius:12px;padding:16px 18px;backdrop-filter:blur(3px)}
+  b{color:#f0b429}
+</style>
+</head><body>
+<div class="wrap">
+  <div class="card">
+    <h2>🌌 星轨夜空皮肤</h2>
+    <p>这是插件 <code>example-skin</code> 的面板页，它存在的意义就是<b>当个样板</b>：告诉你插件能把工作台改到什么程度。</p>
+    <ul>
+      <li><b>背景板</b> —— 你现在看到的这片星空，是插件目录里的 <code>bg.svg</code>，由 <code>plugin.json</code> 的 <code>ui.background</code> 指定</li>
+      <li><b>配色 / 圆角 / 强调色</b> —— <code>ui.css</code> 覆盖了工作台的主题变量，金色是 <code>--accent</code></li>
+      <li><b>功能栏图标 / 设置项 / 弹出面板</b> —— <code>ui.js</code> 用 <code>window.WB</code> 加的</li>
+      <li><b>回复签名</b> —— 后端 <code>main.py</code> 的 <code>before_send</code> 钩子给每条回复加上「✦ 星轨」</li>
+      <li><b>自定义指令</b> —— 在任意会话发 <code>/skin</code>，由插件直接作答</li>
+    </ul>
+    <p>状态接口：<code>GET /api/example-skin/stats</code></p>
+  </div>
+</div>
+</body></html>

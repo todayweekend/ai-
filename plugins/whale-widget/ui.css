@@ -1,0 +1,87 @@
+/* 小鲸鱼余额挂件 · 样式（注入到工作台界面） */
+#whaleWidget {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 99999;
+  width: 132px;
+  user-select: none;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --whale-scale: 1;
+  transform: scale(var(--whale-scale));
+  transform-origin: bottom right;
+  cursor: grab;
+  transition: transform .18s ease;
+}
+#whaleWidget.dragging { cursor: grabbing; transition: none; }
+
+#whaleWidget .whale-img {
+  width: 100%;
+  display: block;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,.35));
+  transition: transform .12s ease;
+}
+#whaleWidget.press .whale-img { transform: scaleY(.86) scaleX(1.06); }
+
+#whaleWidget .whale-bal {
+  margin-top: 2px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1.1;
+  color: #eef4ff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.55);
+}
+#whaleWidget .whale-hint {
+  text-align: center;
+  font-size: 11px;
+  color: #b9c6e6;
+  text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  margin-top: 1px;
+}
+#whaleWidget .whale-err { color: #ff9a9a; font-size: 11px; }
+
+/* 气泡（随机台词 / 余额变动提示） */
+#whaleWidget .whale-bubble {
+  position: absolute;
+  right: 4px;
+  bottom: calc(100% - 6px);
+  max-width: 220px;
+  padding: 8px 12px;
+  background: rgba(20,28,48,.94);
+  color: #eaf1ff;
+  border: 1px solid rgba(120,160,255,.5);
+  border-radius: 14px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  box-shadow: 0 8px 22px rgba(0,0,0,.4);
+  opacity: 0;
+  transform: translateY(6px) scale(.96);
+  transition: opacity .2s ease, transform .2s ease;
+  pointer-events: none;
+}
+#whaleWidget .whale-bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+#whaleWidget .whale-bubble .amt { color: #ff7a7a; font-weight: 800; font-size: 15px; }
+
+/* 小按钮：静音 / 刷新 */
+#whaleWidget .whale-btns {
+  position: absolute;
+  top: -6px; left: -6px;
+  display: flex; gap: 4px;
+  opacity: 0; transition: opacity .15s ease;
+}
+#whaleWidget:hover .whale-btns { opacity: 1; }
+#whaleWidget .whale-btns button {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid rgba(120,160,255,.5);
+  background: rgba(20,28,48,.9); color: #cfe; cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 0;
+}
+#whaleWidget .whale-btns button:hover { background: rgba(40,55,90,.95); }
+
+/* 当前账户名（多账户版新增） */
+#whaleWidget .whale-acc {
+  text-align: center; font-size: 10.5px; color: #9fb0d6;
+  text-shadow: 0 1px 2px rgba(0,0,0,.5); margin-top: 1px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

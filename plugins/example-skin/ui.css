@@ -1,0 +1,57 @@
+/* ============================================================
+   星轨夜空皮肤 · 界面改造（插件 example-skin）
+   这里能改工作台的一切外观：背景板、配色、圆角、字号、任意布局
+   ============================================================ */
+
+/* 背景板由 plugin.json 的 ui.background 提供（bg.svg）；
+   只要把那层图透出来，就得让原本不透明的面板变半透明 */
+
+body.example-skin[data-theme="light"]{
+  --bg:transparent;
+  --panel:rgba(255,255,255,.80);
+  --panel2:rgba(255,255,255,.62);
+  --line:rgba(15,23,42,.14);
+  --tool-bg:rgba(255,255,255,.70);
+  --tool-line:rgba(15,23,42,.12);
+}
+body.example-skin[data-theme="dark"]{
+  --bg:transparent;
+  --panel:rgba(16,20,30,.78);
+  --panel2:rgba(22,27,39,.62);
+  --line:rgba(255,255,255,.14);
+  --tool-bg:rgba(10,14,22,.66);
+  --tool-line:rgba(255,255,255,.12);
+}
+
+/* 圆角 / 强调色：金色星轨 */
+body.example-skin{
+  --r-btn:8px;
+  --r-msg:15px;
+  --r-box:11px;
+  --accent:#e0a52a;
+  --accent-rgb:224,165,42;
+  --on-accent:#1a1407;
+  --mw:82%;
+}
+
+/* 第一栏：金色分隔线 */
+body.example-skin #rail{
+  border-right-color:rgba(240,180,41,.34);
+  background:color-mix(in srgb, var(--panel) 88%, #f0b429 12%);
+}
+
+/* 聊天列表：淡淡的金色描边 */
+body.example-skin #clist{ border-right-color:rgba(240,180,41,.22); }
+
+/* AI 气泡：略微提亮，读起来更清楚 */
+body.example-skin #chat .gbody{ backdrop-filter:blur(2px); }
+
+/* 顶部标题栏下沿加一条会发光的细线 —— 呼应星轨 */
+body.example-skin #chead{
+  position:relative;
+  border-bottom:1px solid rgba(240,180,41,.28);
+}
+body.example-skin #chead::after{
+  content:""; position:absolute; left:0; right:0; bottom:-1px; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(240,180,41,.85), transparent);
+}

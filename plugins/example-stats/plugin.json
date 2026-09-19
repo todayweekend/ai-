@@ -1,0 +1,9 @@
+{
+  "name": "example-stats",
+  "title": "示例插件：发言统计",
+  "version": "1.0.0",
+  "author": "多 AI 工作台",
+  "description": "统计每个 AI 被回复的次数与字数，带一个面板页和自带接口。是写插件的活教材——照抄改改就是你的插件。",
+  "main": "main.py",
+  "panel": "panel.html"
+}
