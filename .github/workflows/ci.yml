@@ -33,47 +33,56 @@ jobs:
       - name: 语法检查（全项目编译一遍）
         run: python -m compileall -q app.py check.py autostart.py plugins tests mcp_demo
 
-      # 下面两个测试都是「对着正在运行的服务打接口」的端到端测试，
-      # 所以得先把工作台真拉起来。首次启动会自动生成一份空的 config.json
-      # （没有成员、没有任何密钥），所以这一步不需要任何 API Key。
-      - name: 启动工作台（后台）
+      # 两个测试都是「对着正在运行的服务打接口」的端到端测试，所以得先把工作台拉起来。
+      # 首次启动会自动生成一份空的 config.json（没有成员、没有任何密钥），
+      # 因此这里不需要任何 API Key。
+      #
+      # 为什么三件事挤在一个 step 里：后台进程是这一个 step 的子进程，
+      # step 一结束它就会被 runner 回收 —— 拆成「启动 / 等就绪 / 测试」三个 step 时，
+      # 等待步骤全程连不上、而日志里却写着 Uvicorn running，最可能就是被回收了。
+      # 收进一个 step 里就完全不依赖「跨 step 的进程存活」这件事。
+      - name: 启动服务 → 等就绪 → 跑两个端到端测试
         shell: pwsh
         run: |
+          Write-Host "== 1) 后台启动 app.py =="
           $p = Start-Process -FilePath python -ArgumentList "app.py" `
                  -RedirectStandardOutput server-out.log `
                  -RedirectStandardError server-err.log `
                  -PassThru -NoNewWindow
-          Write-Host "app.py 已启动，PID = $($p.Id)"
+          Write-Host "PID = $($p.Id)"
 
-      - name: 等服务就绪
-        shell: pwsh
-        run: |
-          for ($i = 1; $i -le 60; $i++) {
+          Write-Host "`n== 2) 等服务就绪（最多 120 秒）=="
+          $ok = $false
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          while ($sw.Elapsed.TotalSeconds -lt 120) {
+            try { if ($p.HasExited) { break } } catch { }
             try {
-              $r = Invoke-WebRequest -Uri "$env:WB_BASE/api/plugins" -UseBasicParsing -TimeoutSec 5
-              if ($r.StatusCode -eq 200) {
-                Write-Host "服务已就绪（第 $i 秒）→ $env:WB_BASE"
-                exit 0
-              }
+              $r = Invoke-WebRequest -Uri "$env:WB_BASE/api/plugins" `
+                     -UseBasicParsing -TimeoutSec 5
+              if ($r.StatusCode -eq 200) { $ok = $true; break }
             } catch { }
-            Start-Sleep -Seconds 1
+            Start-Sleep -Milliseconds 500
           }
-          Write-Host "::error::等了 60 秒服务还没起来，看下面的服务端日志"
-          exit 1
 
-      - name: 插件系统端到端测试
-        run: python tests/test_plugins.py
-
-      - name: 工作引擎与身份文件测试
-        run: python tests/test_engine.py
-
-      - name: 失败时倒出服务端日志
-        if: failure()
-        shell: pwsh
-        run: |
-          foreach ($f in @("server-out.log", "server-err.log")) {
-            if (Test-Path $f) {
-              Write-Host "===== $f ====="
-              Get-Content $f -Tail 200
+          if (-not $ok) {
+            Write-Host "::error::服务没起来（等了 $([int]$sw.Elapsed.TotalSeconds) 秒）"
+            foreach ($f in @("server-out.log", "server-err.log")) {
+              if (Test-Path $f) {
+                Write-Host "`n===== $f ====="
+                Get-Content $f -Tail 200
+              }
             }
+            exit 1
           }
+          Write-Host "服务已就绪，耗时 $([int]$sw.Elapsed.TotalSeconds) 秒"
+
+          Write-Host "`n== 3) 插件系统端到端测试 =="
+          & python tests/test_plugins.py
+          $rc1 = $LASTEXITCODE
+
+          Write-Host "`n== 4) 工作引擎与身份文件测试 =="
+          & python tests/test_engine.py
+          $rc2 = $LASTEXITCODE
+
+          Write-Host "`n== 结果：test_plugins=$rc1  test_engine=$rc2 =="
+          if ($rc1 -ne 0 -or $rc2 -ne 0) { exit 1 }
